@@ -183,7 +183,7 @@ class RAM_Dataset(torch.utils.data.Dataset):
         return char_ja.kuten().chars
 
     def get_joyo_chars(self):
-        from triangle2023 import chars_joyo as chars_joyo
+        from .char_ja import chars_joyo as chars_joyo
         joyo_chars = chars_joyo().char_list
         return joyo_chars
 
