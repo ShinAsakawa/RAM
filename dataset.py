@@ -179,8 +179,8 @@ class RAM_Dataset(torch.utils.data.Dataset):
         return 'ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂッツヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶ'
 
     def get_kuten_chars(self):
-        import .char_ja
-        return char_ja.kuten().chars
+        from .char_ja import kuten as kuten
+        return kuten().chars
 
     def get_joyo_chars(self):
         from .char_ja import chars_joyo as chars_joyo
