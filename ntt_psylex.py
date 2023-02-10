@@ -1038,7 +1038,7 @@ class psylex71_dataset(torch.utils.data.Dataset):
         print('# NTT日本語語彙特性 (天野，近藤; 1999, 三省堂)より頻度情報を取得')
         if ps71_fname == None:
             # データファイルの保存してあるディレクトリの指定
-            ntt_dir = 'triangle2023'
+            ntt_dir = 'RAM'
             psy71_fname = 'psylex71utf8.txt'  # ファイル名
             psy71_fname = 'psylex71utf8.txt.gz'  # ファイル名
             # with gzip.open(os.path.join(ntt_dir,psy71_fname), 'r') as f:

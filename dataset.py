@@ -179,7 +179,7 @@ class RAM_Dataset(torch.utils.data.Dataset):
         return 'ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂッツヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶ'
 
     def get_kuten_chars(self):
-        from triangle2023 import char_ja
+        import .char_ja
         return char_ja.kuten().chars
 
     def get_joyo_chars(self):
@@ -278,7 +278,7 @@ class VDRJ_Dataset(RAM_Dataset):
                  max_words:int=20000,
                  stop_list:list=fushimi1999_list[:120]):
 
-        vdrj_data_fname = 'reading_ja_model/vdrj_data.gz'
+        vdrj_data_fname = 'RAM/vdrj_data.gz'
         with gzip.open(vdrj_data_fname, 'rb') as zipfile:
             _X = json.loads(zipfile.read().decode('utf-8'))
         vdrj_dict = _X['dict']
