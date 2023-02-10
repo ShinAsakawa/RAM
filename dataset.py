@@ -220,8 +220,8 @@ class Psylex71_Dataset(RAM_Dataset):
                  stop_list:list=fushimi1999_list[:120],
                 ):
 
-        psylex71_data_fname = 'reading_ja_model/psylex71_data.gz'
-        vdrj_data_fname = 'reading_ja_model/vdrj_data.gz'
+        psylex71_data_fname = 'RAM/psylex71_data.gz'
+        vdrj_data_fname = 'RAM/vdrj_data.gz'
         with gzip.open(psylex71_data_fname, 'rb') as zipfile:
             _X = json.loads(zipfile.read().decode('utf-8'))
         psylex71_dict = _X['dict']
