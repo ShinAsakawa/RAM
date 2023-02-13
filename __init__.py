@@ -8,6 +8,9 @@ __copyright__ = 'Copyright 2022 {0}'.format(__author__)
 
 from .dataset import *
 from .model import *
+# from .model import EncoderRNN
+# from .model import AttnDecoderRNN
+#from .model import *
 from .utils import *
 from .ntt_psylex import *
 from .fushimi1999 import *

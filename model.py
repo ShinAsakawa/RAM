@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .utils import check_vals_performance
-from .utils import convert_ids2tensor
-from .utils import timeSince
+#from .utils import check_vals_performance
+#from .utils import convert_ids2tensor
+#from .utils import timeSince
 
 from termcolor import colored
 import random
@@ -70,7 +70,7 @@ class AttnDecoderRNN(nn.Module):
 
         self.dropout = nn.Dropout(p=dropout_p)
 
-        # GRU には batch_first オプションをつけていない。これは，一系列ずつしかしょりしないため
+        # GRU には batch_first オプションをつけていない。これは，一系列ずつしか処理しないため
         self.gru = nn.GRU(input_size=n_hid, hidden_size=n_hid)
 
         # 最終出力
@@ -90,14 +90,19 @@ class AttnDecoderRNN(nn.Module):
 
         # エンコーダの中間層の値を計算:= 注意の重み (attn_weights) * エンコーダの出力 (hiden) = 注意を描けた
         # この attn_weights.unsqueeze(0) は 第 1 次元が batch になっているようだ
-        #print(f'attn_weights.unsqueeze(0).size():{attn_weights.unsqueeze(0).size()}',
-        #      f'encoder_outputs.unsqueeze(0).size():{encoder_outputs.unsqueeze(0).size()}'
-        #)
+        # print(f'attn_weights.unsqueeze(0).size():{attn_weights.unsqueeze(0).size()}')
+        # print(f'encoder_outputs.unsqueeze(0).size():{encoder_outputs.unsqueeze(0).size()}')
         #sys.exit()
         attn_applied = torch.bmm(attn_weights.unsqueeze(0), encoder_outputs.unsqueeze(0))
 
+        # print(f'attn_weight.unsqeeze(0).size():{attn_weights.unsqueeze(0).size()}')
+        # print(f'encoder_outputs.unsqeeze(0).size():{encoder_outputs.unsqueeze(0).size()}')
+        # print(f'attn_applied.size():{attn_applied.size()}')
         out = torch.cat((embedded[0], attn_applied[0]), 1)
+        # print(f'out.size():{out.size()}')
         out = self.attn_combine(out).unsqueeze(0)
+        # print(f'out.size():{out.size()}')
+        # sys.exit()
 
         out = F.relu(out)
         out, hid = self.gru(out, hid)
@@ -219,6 +224,10 @@ def train_one_seq2seq(
     # enc_outputs の定義。max_length は系列の最大長。注意機構では，この enc_outputs を使う
     enc_outputs = torch.zeros(max_length, encoder.n_hid, device=device)
 
+    if inp_len > enc_outputs.size(0):
+        print(f'inp_len:{inp_len}, enc_outputs.size():{enc_outputs.size()}')
+        print(f'inp_tensor:{inp_tensor}')
+        sys.exit()
     loss = 0.                          # 損失値
     for ei in range(inp_len):          # 入力時刻分だけ反復
         enc_out, enc_hid = encoder(inp=inp_tensor[ei], hid=enc_hid, device=device)
@@ -261,6 +270,10 @@ def train_one_seq2seq(
     return loss.item() / tgt_len, ok_flag
 
 
+#from .utils import check_vals_performance
+#from .utils import convert_ids2tensor
+from .utils import *
+
 def train_epochs(
     epochs:int=1,
     encoder:torch.nn.Module=None,
@@ -275,21 +288,30 @@ def train_epochs(
     n_sample:int=3,
     teacher_forcing_ratio=False,
     train_dataset:torch.utils.data.Dataset=None,
-    val_dataset:dict=None,
+    val_dataset:dict="",
     max_length:int=1,
     device=device)->list:
     '''`train_one_seq2seq()` を反復して呼び出してモデルを学習させる'''
 
     start_time = time.time()
 
-    encoder.train()
-    decoder.train()
     #criterion = params['loss_func']
 
     losses = []
     for epoch in range(epochs):
-        epoch_loss, ok_count = 0, 0
 
+        if val_dataset != "":
+            encoder.eval(); decoder.eval()
+            _val = check_vals_performance(
+                _dataset=val_dataset,
+                encoder=encoder,decoder=decoder,
+                source_vocab=source_vocab, target_vocab=target_vocab,
+                max_length=max_length)
+        if n_sample > 0:
+            evaluateRandomly(encoder, decoder, n=n_sample)
+
+        encoder.train(); decoder.train()
+        epoch_loss, ok_count = 0, 0
         #エポックごとに学習順をシャッフル
         learning_order = np.random.permutation(train_dataset.__len__())
         for i in range(train_dataset.__len__()):
@@ -313,14 +335,9 @@ def train_epochs(
         print(colored(f'エポック:{epoch:2d} 損失:{epoch_loss/train_dataset.__len__():.2f}', 'blue', attrs=['bold']),
               colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}',
                       'cyan', attrs=['bold']),
-              colored(f'訓練データ精度:{ok_count/train_dataset.__len__():.3f}', 'blue', attrs=['bold']))
+              colored(f'訓練データ精度:{ok_count/train_dataset.__len__():.3f}', 'blue', attrs=['bold']),
+              colored(f'検証データ:{_val}', 'cyan', attrs=['bold'])
+              )
 
-        if val_dataset != None:
-            check_vals_performance(_dataset=val_dataset,
-                                   encoder=encoder,decoder=decoder,
-                                   source_vocab=source_vocab, target_vocab=target_vocab,
-                                   max_length=max_length)
-        if n_sample > 0:
-            evaluateRandomly(encoder, decoder, n=n_sample)
 
     return losses
