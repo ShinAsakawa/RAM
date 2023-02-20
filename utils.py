@@ -1,4 +1,6 @@
 import torch
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -59,9 +61,7 @@ def draw_word_char_histgram(
     plt.ylabel('相対頻度')
     plt.show()
 
-
     N_len=np.array([v for v in len_count.values()]).sum()
-
     len_count_sorted = sorted(len_count.items(), key=operator.itemgetter(0), reverse=False)
     plt.figure(figsize=figsize2)
     plt.bar(range(len(len_count_sorted)), [x[1]/N_len for x in len_count_sorted])
@@ -71,52 +71,33 @@ def draw_word_char_histgram(
     plt.show()
 
 
-
 def eval_input_seq2seq(
     inp_wrd:str='////',
-    encoder:torch.nn.Module=None, 
-    decoder:torch.nn.Module=None,
-    ds:torch.utils.data.Dataset=None,
-    topN:int=2,
-    isPrint:bool=True,
-    ):
+    encoder:torch.nn.Module=None,    decoder:torch.nn.Module=None,
+    ds:torch.utils.data.Dataset=None, topN:int=2, isPrint:bool=True):
 
     if inp_wrd == '////':
-        inp_wrd = input('単語を入力:')
+        if ds.source == 'orth':
+            inp_wrd = input('単語を入力:')
+        elif ds.source == 'phon':
+            inp_wrd = input('｢よみ｣をひらがなで入力:')
+            inp_wrd = jaconv.hiragana2julius(inp_wrd).split()
 
-    inp_ids = ds.source_tkn2ids(inp_wrd) + [ds.source_list.index('<EOW>')]
-    inp_tensor = convert_ids2tensor(inp_ids)
-
-    encoder.eval(); decoder.eval()
-    enc_hid = encoder.initHidden()
-    enc_outputs = torch.zeros(ds.target_maxlen, encoder.n_hid, device=device)
-    for ei in range(inp_tensor.size(0)):
-        enc_out, enc_hid = encoder(inp=inp_tensor[ei], hid=enc_hid, device=device)
-        enc_outputs[ei] = enc_out[0,0]
-
-    dec_inp = torch.tensor([[ds.target_list.index('<SOW>')]], device=device)
-    dec_hid = enc_hid
-    dec_wrds, dec_ids, dec_vals = [], [], []
-    dec_attns = torch.zeros(ds.target_maxlen, ds.target_maxlen)
-    for di in range(ds.target_maxlen):
-        dec_out, dec_hid, dec_attn = decoder(inp=dec_inp, hid=dec_hid,
-                                             encoder_outputs=enc_outputs, device=device)
-        dec_attns[di] = dec_attn.data
-        topv, topi = dec_out.data.topk(topN)
-        dec_ids.append(topi.detach().squeeze().numpy()[0])
-        dec_vals.append(topv.detach().squeeze().numpy())
-        #print(f'topi.squeeze().numpy()[0]:{topi.squeeze().numpy()[0]}')
-        if topi.squeeze().numpy()[0] == ds.target_list.index('<EOW>'):
-            break
-        dec_inp = topi.detach().squeeze()[0]
-
-    dec_wrds = ds.target_ids2tkn(dec_ids)
-
-    likelihood = np.array(dec_vals)
+    _input_ids = ds.source_tkn2ids(inp_wrd) + [ds.source_list.index('<EOW>')]
+    _output_words, _output_ids, _attentions = evaluate(
+        encoder=encoder, decoder=decoder,
+        input_ids=_input_ids,
+        max_length=ds.maxlen,
+        source_vocab=ds.source_list,
+        target_vocab=ds.target_list,
+    )
+    dec_wrds = _output_words
 
     if isPrint:
-        print(f'出力:{dec_wrds}, likelihood:{likelihood}') # np.array(dec_vals)}')
-    return dec_wrds, likelihood
+        print(f'出力:{dec_wrds}') # np.array(dec_vals)}')
+        #print(f'出力:{dec_wrds}, likelihood:{likelihood}') # np.array(dec_vals)}')
+    return dec_wrds, None
+    #return dec_wrds, likelihood
 
 
 def convert_ids2tensor(
@@ -150,7 +131,7 @@ def timeSince(since:time.time,
 
 def calc_accuracy(
     encoder, decoder,
-    _dataset, 
+    _dataset,
     max_length=None,
     source_vocab=None, target_vocab=None,
     source_ids=None, target_ids=None,
@@ -177,13 +158,10 @@ def calc_accuracy(
 
 
 def evaluate(
-    encoder:torch.nn.Module,
-    decoder:torch.nn.Module,
+    encoder:torch.nn.Module, decoder:torch.nn.Module,
     input_ids:list=None,
-    max_length:int=1,
-    source_vocab:list=None,
-    target_vocab:list=None,
-    device:torch.device=device):
+    source_vocab:list=None, target_vocab:list=None,
+    max_length:int=1, device:torch.device=device):
 
     with torch.no_grad():
         input_tensor = convert_ids2tensor(input_ids)
@@ -219,6 +197,31 @@ def evaluate(
         return decoded_words, decoded_ids, decoder_attns[:di + 1]  # decoded_ids を返すように変更
 
 
+def check_a_dataset(
+    encoder:torch.nn.Module=None,
+    decoder:torch.nn.Module=None,
+    _dataset:torch.utils.data.Dataset=None,
+    max_length:int=0,
+    source_vocab:list=None,
+    target_vocab:list=None,
+    device:torch.device=device):
+
+    if (_dataset == None) or (encoder == None) or (decoder == None) or (max_length == 0) or (source_vocab == None):
+        return
+
+    ret = []
+    ok_count = 0
+    for i in range(_dataset.__len__()):
+        _input_ids, _target_ids = _dataset.__getitem__(i)
+        _output_words, _output_ids, _attentions = evaluate(
+            encoder=encoder, decoder=decoder,
+            source_vocab=source_vocab, target_vocab=target_vocab,
+            input_ids=_input_ids, max_length=max_length, device=device)
+        ok_count += 1 if _target_ids == _output_ids else 0
+    ret.append(f'{ok_count/_dataset.__len__():.3f}')
+    return ret
+
+
 def check_vals_performance(
     encoder:torch.nn.Module=None,
     decoder:torch.nn.Module=None,
@@ -231,7 +234,7 @@ def check_vals_performance(
     if (_dataset == None) or (encoder == None) or (decoder == None) or (max_length == 0) or (source_vocab == None):
         return
 
-    ret = []        
+    ret = []
     for _x in _dataset:
         ok_count = 0
         for i in range(_dataset[_x].__len__()):
@@ -251,161 +254,6 @@ def check_vals_performance(
     #print()
     return ret
 
-
-
-def _train(
-    input_tensor:torch.Tensor=None,
-    target_tensor:torch.Tensor=None,
-    encoder:torch.nn.Module=None,
-    decoder:torch.nn.Module=None,
-    encoder_optimizer:torch.optim=None,
-    decoder_optimizer:torch.optim=None,
-    criterion:torch.nn.modules.loss=torch.nn.modules.loss.CrossEntropyLoss,
-    max_length:int=1,
-    target_vocab:list=None,
-    teacher_forcing_ratio:float=0.,
-    device:torch.device=device)->float:
-
-    """inpute_tensor (torch.Tensor() に変換済の入力系列) を 1 つ受け取って，
-    encoder と decoder の訓練を行う
-    """
-
-    encoder_hidden = encoder.initHidden() # 符号化器の中間層を初期化
-    encoder_optimizer.zero_grad()         # 符号化器の最適化関数の初期化
-    decoder_optimizer.zero_grad()         # 復号化器の最適化関数の初期化
-
-    input_length = input_tensor.size(0)   # 0 次元目が系列であることを仮定
-    target_length = target_tensor.size(0)
-    encoder_outputs = torch.zeros(input_length, encoder.n_hid, device=device)
-    #encoder_outputs = torch.zeros(max_length, encoder.n_hid, device=device)
-
-    loss = 0.  # 損失関数値
-    for ei in range(input_length):
-        encoder_output, encoder_hidden = encoder(
-            inp=input_tensor[ei],
-            hid=encoder_hidden,
-            device=device)
-        encoder_outputs[ei] = encoder_output[0, 0]
-
-    decoder_input = torch.tensor([[target_vocab.index('<SOW>')]], device=device)
-    decoder_hidden = encoder_hidden
-
-    ok_flag = True
-    # 教師強制をするか否かを確率的に決める
-    use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
-
-    if use_teacher_forcing: # 教師強制する場合 Teacher forcing: Feed the target as the next input
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(decoder_input,
-                                                                        decoder_hidden,
-                                                                        encoder_outputs,
-                                                                        device=device)
-            decoder_input = target_tensor[di]      # 教師強制 する
-
-            loss += criterion(decoder_output, target_tensor[di])
-            ok_flag = (ok_flag) and (decoder_output.argmax() == target_tensor[di].detach().cpu().numpy()[0])
-            if decoder_input.item() == target_vocab.index('<EOW>'):
-                break
-
-    else: # 教師強制しない場合 Without teacher forcing: use its own predictions as the next input
-        for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(decoder_input,
-                                                                        decoder_hidden,
-                                                                        encoder_outputs,
-                                                                        device=device)
-            topv, topi = decoder_output.topk(1)     # 教師強制しない
-            decoder_input = topi.squeeze().detach()
-
-            loss += criterion(decoder_output, target_tensor[di])
-            ok_flag = (ok_flag) and (decoder_output.argmax() == target_tensor[di].detach().cpu().numpy()[0])
-            if decoder_input.item() == target_vocab.index('<EOW>'):
-                break
-
-    loss.backward()           # 誤差逆伝播
-    encoder_optimizer.step()  # encoder の学習
-    decoder_optimizer.step()  # decoder の学習
-    return loss.item() / target_length, ok_flag
-
-
-def _fit(encoder:torch.nn.Module,
-         decoder:torch.nn.Module,
-         epochs:int=1,
-         lr:float=0.0001,
-         n_sample:int=3,
-         teacher_forcing_ratio=False,
-         train_dataset:torch.utils.data.Dataset=None,
-         val_dataset:dict=None,
-         source_vocab:list=None,
-         target_vocab:list=None,
-         source_ids:str=None,
-         target_ids:list=None,
-         params:dict=None,
-         max_length:int=1,
-         device:torch.device=device,
-         #device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
-        )->list:
-
-    start_time = time.time()
-
-    encoder.train()
-    decoder.train()
-    encoder_optimizer = params['optim_func'](encoder.parameters(), lr=lr)
-    decoder_optimizer = params['optim_func'](decoder.parameters(), lr=lr)
-    criterion = params['loss_func']
-    losses = []
-
-    for epoch in range(epochs):
-        epoch_loss = 0
-        ok_count = 0
-
-        #エポックごとに学習順をシャッフルする
-        learning_order = np.random.permutation(train_dataset.__len__())
-
-        for i in range(train_dataset.__len__()):
-            x = learning_order[i]   # ランダムにデータを取り出す
-            input_ids, target_ids = train_dataset.__getitem__(x)
-            input_tensor = convert_ids2tensor(input_ids)
-            target_tensor = convert_ids2tensor(target_ids)
-
-            #訓練の実施
-            loss, ok_flag = _train(input_tensor=input_tensor,
-                                   target_tensor=target_tensor,
-                                   encoder=encoder,
-                                   decoder=decoder,
-                                   encoder_optimizer=encoder_optimizer,
-                                   decoder_optimizer=decoder_optimizer,
-                                   criterion=criterion,
-                                   max_length=max_length,
-                                   target_vocab=target_vocab,
-                                   teacher_forcing_ratio=teacher_forcing_ratio,
-                                   device=device)
-            epoch_loss += loss
-            ok_count += 1 if ok_flag else 0
-
-
-        losses.append(epoch_loss/train_dataset.__len__())
-        print(colored(f'エポック:{epoch:2d} 損失:{epoch_loss/train_dataset.__len__():.2f}', 'blue', attrs=['bold']),
-              colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}',
-                      'cyan', attrs=['bold']),
-              colored(f'訓練データの精度:{ok_count/train_dataset.__len__():.3f}', 'blue', attrs=['bold']))
-
-        check_vals_performance(_dataset=val_dataset,
-                               encoder=encoder,
-                               decoder=decoder,
-                               max_length=max_length,
-                               source_vocab=source_vocab,
-                               target_vocab=target_vocab,
-                               source_ids=source_ids,
-                               target_ids=target_ids)
-        if n_sample > 0:
-            evaluateRandomly(encoder, decoder, n=n_sample)
-
-    return losses
-
-
-
-#from RAM.dataset import *
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 # シミュレーションに必要なパラメータの設定用辞書のプロトタイプ
 params = {
@@ -526,7 +374,6 @@ def dup_model_with_params(params:dict=params,
 # encoder2_optimizer, decoder2_optimizer = X['encoder_optimizer'], X['decoder_optimizer']
 # train_dataset2, val_dataset2 = X['train_dataset'], X['val_dataset']
 # ds2.__len__()
-
 def check_fushimi1999_words(encoder:torch.nn.Module,
                             decoder:torch.nn.Module,
                             ds:torch.utils.data.Dataset,
@@ -535,34 +382,32 @@ def check_fushimi1999_words(encoder:torch.nn.Module,
     ok_count = 0
     for i, wrd in enumerate(fushimi1999_list):
         _end = ", " if ((i+1) % cr_every) != 0 else '\n'
-    
+
         if wrd in ds.orth2info_dict:
             _inp = ds.orth2info_dict[wrd][ds.source]
-            _out = eval_input_seq2seq(ds=ds, 
-                                      encoder=encoder, decoder=decoder, 
-                                      inp_wrd=_inp, isPrint=False)
+            _out = eval_input_seq2seq(ds=ds, encoder=encoder, decoder=decoder, inp_wrd=_inp, isPrint=False)
             _out_wrd = _out[0][:-1]
             _tch = ds.orth2info_dict[wrd][ds.target]
             is_ok = _tch == _out_wrd
             if is_ok:
                 ok_count += 1
-        
+
                 _out_wrd = "".join(c for c in _out_wrd)
                 _tch_wrd = ''.join(c for c in _tch)
-        
+
                 color = "blue" if is_ok else "red"
-                print(f'{i+1:03d} {wrd}', 
-                      f":/{_out_wrd}/({_tch_wrd})", 
+                print(f'{i+1:03d} {wrd}',
+                      f":/{_out_wrd}/({_tch_wrd})",
                       colored(f'{is_ok}', color, attrs=["bold"]), end=_end)
             else:
-                print(f'{i+1:03d} {wrd}', f'/{"".join(c for c in _out_wrd)}/', '-' * 12, end=_end) 
+                print(f'{i+1:03d} {wrd}', f'/{"".join(c for c in _out_wrd)}/', '-' * 12, end=_end)
         else:
             print(f'{i+1:03d}', colored(f'{wrd} 訓練データに存在しない', color='cyan', attrs=['bold']), end=_end)
-        
+
     N = i + 1
     color='green'
     print('正解率:',colored(f'{ok_count/N * 100:.3f}%=({ok_count}/{N})', color, attrs=['bold']))
-    
+
 
 from .dataset import *
 # 符号化器-復号化器モデルの定義
@@ -585,28 +430,28 @@ def set_model_from_param_file(fname:str='2023_0213ram.pt'):
     # これらは，`RAM/make_psylex71_dict.py`, `RAM/make_vdrj_dict.py` を実行して作成されたデータファイルである。
     # ここでは，これらのデータファイルが作成済と仮定している。
     if params['dataset_name'] == 'psylex71':
-        psylex71_dataset = Psylex71_Dataset(source=params['source'], 
-                                            target=params['target'], 
+        psylex71_dataset = Psylex71_Dataset(source=params['source'],
+                                            target=params['target'],
                                             max_words=params['traindata_size'])
         ds = psylex71_dataset
     elif params['dataset_name'] == 'vdrj':
-        vdrj_dataset     = VDRJ_Dataset(source=params['source'], 
-                                        target=params['target'], 
+        vdrj_dataset     = VDRJ_Dataset(source=params['source'],
+                                        target=params['target'],
                                         max_words=params['traindata_size'])
         ds = vdrj_dataset
     elif params['dataset_name'] == 'onechar':
-        onechar_dataset  = OneChar_Dataset(source=params['source'], 
+        onechar_dataset  = OneChar_Dataset(source=params['source'],
                                            target=params['target'])
         ds = onechar_dataset
     elif params['dataset_name'] == 'fushimi1999':
-        fushimi1999_dataset = Fushimi1999_Dataset(source=params['source'], 
+        fushimi1999_dataset = Fushimi1999_Dataset(source=params['source'],
                                                   target=params['target'])
         ds = fushimi1999_dataset
     else:
-        psylex71_dataset = Psylex71_Dataset(source=params['source'], target=params['target'], 
+        psylex71_dataset = Psylex71_Dataset(source=params['source'], target=params['target'],
                                             max_words=params['traindata_size'])
         ds = psylex71_dataset
-    
+
     encoder = EncoderRNN(
         n_inp=len(ds.source_list),               # 符号化器への入力データ次元数の特徴数 (語彙数): int
         n_hid=params['hidden_size']).to(device)  # 符号化器の中間層数，埋め込みベクトルとして復号化器へ渡される次元数: int
@@ -629,3 +474,189 @@ def set_model_from_param_file(fname:str='2023_0213ram.pt'):
 
     return encoder, decoder, encoder_optimizer, decoder_optimizer, params, ds
 
+
+# from RAM import train_one_seq2seq
+# from RAM import train_epochs
+
+import os
+
+def set_params_from_config(
+    json_fname:str="",
+    configs:str=None,
+    device:torch.device=device):
+
+    X = set_params_from_file(
+        json_fname=json_fname,
+        params=configs,
+        device=device)
+
+    ret = {
+        'params': X[0],
+        'encoder': X[1],
+        'decoder': X[2],
+        'dataset': X[3],
+        'train_dataset': X[4],
+        'val_dataset': X[5],
+        'encoder_optimizer': X[6],
+        'decoder_optimizer': X[7],
+        'N_train': X[8],
+        'N_val': X[9]}
+    return ret
+
+def set_params_from_file(json_fname:str="",
+                         params:dict=None,
+                         device:torch.device=device):
+
+    if json_fname != "":
+        try:
+            os.path.exists(json_fname)
+        except:
+            print(f"file {json_fname} does not exist")
+            sys.exit()
+
+        with open(json_fname, 'r') as fp:
+            params = json.load(fp)
+    elif params == None:
+        print('params is None')
+        sys.exit()
+
+    stop_list = [] if params.get('stop_list')==None else params['stop_list']
+    # データセットの読み込み
+    # 1. Psylex71 は「NTT 日本語の語彙特性」頻度表であり，著作権上の問題があるため配布不可
+    # 2. VDRJ は松下言語学習ラボ，[日本語を読むための語彙データベース（研究用）](http://www17408ui.sakura.ne.jp/tatsum/database.html#vdrj) を加工して作成したデータである
+    # 3. OneChar は一文字の読みについてのおもちゃのデータセットである。
+    #
+    # RAM ディレクトリ直下に，`psylex71_data.gz`, `vdrj_data.gz` がある。
+    # これらは，`RAM/make_psylex71_dict.py`, `RAM/make_vdrj_dict.py` を実行して作成されたデータファイルである。
+    # ここでは，これらのデータファイルが作成済と仮定している。
+    if params['dataset_name'] == 'psylex71':
+        psylex71_dataset = Psylex71_Dataset(source=params['source'], target=params['target'],
+                                            max_words=params['traindata_size'],
+                                            stop_list=stop_list)
+                                            #stop_list=fushimi1999_list[:120])
+                                            # fushimi1999_list[:120] としているのは 240 以降の単語は非単語である。
+                                            # このため，検証データとしては不適なため
+        ds = psylex71_dataset
+    elif params['dataset_name'] == 'vdrj':
+        vdrj_dataset     = VDRJ_Dataset(source=params['source'], target=params['target'],
+                                        max_words=params['traindata_size'],
+                                        stop_list=stop_list)
+                                        #stop_list=fushimi1999_list[:120])
+        ds = vdrj_dataset
+    elif params['dataset_name'] == 'onechar':
+        onechar_dataset  = OneChar_Dataset(source=params['source'], target=params['target'])
+        ds = onechar_dataset
+    elif params['dataset_name'] == 'fushimi1999':
+        fushimi1999_dataset = Fushimi1999_Dataset(source=params['source'], target=params['target'])
+        ds = fushimi1999_dataset
+    else:
+        psylex71_dataset = Psylex71_Dataset(source=params['source'], target=params['target'],
+                                            max_words=params['traindata_size'],
+                                            stop_list=stop_list)
+                                            #stop_list=fushimi1999_list[:120])
+        ds = psylex71_dataset
+
+
+    encoder = EncoderRNN(
+        n_inp=len(ds.source_list),               # 符号化器への入力データ次元数の特徴数 (語彙数): int
+        n_hid=params['hidden_size']).to(device)  # 符号化器の中間層数，埋め込みベクトルとして復号化器へ渡される次元数: int
+                                                 # 復号化器の出力層素子数は，入力層と同一であるので指定しない
+
+    decoder = AttnDecoderRNN(
+        n_hid=params['hidden_size'],             # 復号化器の中間層次元数: int
+        n_out=len(ds.target_list),               # 復号化器の出力層次元数，入力層の次元と等しいので入力層次元を指定せず: int
+        dropout_p=params['dropout_p'],
+        max_length=ds.maxlen).to(device)
+
+    ## データを訓練データと検証データとに分割
+    N_train = int(ds.__len__() * params['traindata_ratio'])   # 訓練データを 90 % に相当する数に
+    N_val   = ds.__len__() - N_train    # 検証データを残り 10 % に相当する数
+    if (params['dataset_name'] == 'onechar') or (params['dataset_name'] == 'fushimi1999'):
+        train_dataset = ds
+        val_dataset = None
+        N_train = len(ds.data_dict)
+        N_val = 0
+    else:
+        train_dataset, val_dataset = torch.utils.data.random_split(
+            dataset=ds,
+            lengths=(N_train, N_val),
+            generator=torch.Generator().manual_seed(params['random_seed']))
+
+    ## 訓練用最適化関数の定義
+    if isinstance(params['optim_func'], str):
+        params['optim_func'] = eval(params['optim_func'])
+
+    encoder_optimizer = params['optim_func'](encoder.parameters(), lr=params['lr'])
+    decoder_optimizer = params['optim_func'](decoder.parameters(), lr=params['lr'])
+    params['loss_func'] = eval(params['loss_func'])()
+    #params['loss_func'] = str(params['loss_func'])
+
+    return params, encoder, decoder, ds, train_dataset, val_dataset, \
+            encoder_optimizer, decoder_optimizer, N_train, N_val
+
+
+import datetime
+
+def save_model_and_params(
+    params:dict=params,
+    models:dict=None,
+    isColab:bool=isColab,
+    force:bool=True,
+    device="cuda:0" if torch.cuda.is_available() else "cpu"):
+
+    fname = params['path_saved']
+    if isColab:
+        # colab 上では，Gdrive 上に保存
+        fname = 'drive/MyDrive/' + fname
+
+    if os.path.exists(fname) and (force!=True):
+        print(f'{fname} というファイルが存在し，かつ，force オプションが {force} であるため保存しません')
+        return
+
+
+    encoder, decoder = models['encoder'], models['decoder']
+    encoder_optimizer, decoder_optimizer = models['encoder_optimizer'], models['decoder_optimizer']
+    losses = models['losses']
+
+    timestamp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    torch.save({'encoder':encoder.state_dict(),
+                'decoder':decoder.state_dict(),
+                'encoder_optimizer': encoder_optimizer.state_dict(),
+                'decoder_optimizer': decoder_optimizer.state_dict(),
+                'params':params,
+                'losses':losses,
+                'timestamp': timestamp}, fname)
+
+    ret = torch.load(fname, map_location=torch.device(device))
+    return ret
+
+
+def save_model_and_configs(
+    configs:dict=params,
+    force:bool=True,
+
+    fname = configs['path_saved']
+    if configs.get('isColab', False)
+    if isColab:
+        # colab 上では，Gdrive 上に保存
+        fname = 'drive/MyDrive/' + fname
+
+    if os.path.exists(fname) and (force!=True):
+        print(f'{fname} というファイルが存在し，かつ，force オプションが {force} であるため保存しません')
+        return
+
+    encoder, decoder = configs['encoder'], configs['decoder']
+    encoder_optimizer, decoder_optimizer = configs['encoder_optimizer'], configs['decoder_optimizer']
+    losses = models['losses']
+
+    timestamp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+    torch.save({'encoder':encoder.state_dict(),
+                'decoder':decoder.state_dict(),
+                'encoder_optimizer': encoder_optimizer.state_dict(),
+                'decoder_optimizer': decoder_optimizer.state_dict(),
+                'configs':configs,
+                'losses':losses,
+                'timestamp': timestamp}, fname)
+
+    ret = torch.load(fname, map_location=torch.device(device))
+    return ret

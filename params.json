@@ -1,0 +1,19 @@
+{
+    "dataset_name"  : "fushimi1999",
+    "traindata_size":  1000,
+    "traindata_ratio": 0.9,
+    "epochs": 10,
+    "source": "orth",
+    "target": "phon",
+    "hidden_size": 128,
+    "lr": 1e-2,
+    "dropout_p": 0.0,
+    "teacher_forcing_ratio": 0.5,
+    "optim_func": "torch.optim.Adam",
+    "loss_func" : "torch.nn.NLLLoss",
+    "random_seed": 42,
+    "pretrained": false,
+    "isTrain"   : true,
+    "verbose"   : false,
+    "path_saved": "2023_0216ram_test.pt"
+}
