@@ -633,7 +633,7 @@ def save_model_and_params(
 
 def save_model_and_configs(
     configs:dict=params,
-    force:bool=True,
+    force:bool=True):
 
     fname = configs['path_saved']
     isColab = configs.get('isColab', False)
