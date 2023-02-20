@@ -636,7 +636,7 @@ def save_model_and_configs(
     force:bool=True,
 
     fname = configs['path_saved']
-    if configs.get('isColab', False)
+    isColab = configs.get('isColab', False)
     if isColab:
         # colab 上では，Gdrive 上に保存
         fname = 'drive/MyDrive/' + fname
