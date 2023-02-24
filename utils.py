@@ -74,7 +74,8 @@ def draw_word_char_histgram(
 def eval_input_seq2seq(
     inp_wrd:str='////',
     encoder:torch.nn.Module=None,    decoder:torch.nn.Module=None,
-    ds:torch.utils.data.Dataset=None, topN:int=2, isPrint:bool=True):
+    ds:torch.utils.data.Dataset=None, topN:int=2, 
+    isPrint:bool=True):
 
     if inp_wrd == '////':
         if ds.source == 'orth':
@@ -83,21 +84,20 @@ def eval_input_seq2seq(
             inp_wrd = input('｢よみ｣をひらがなで入力:')
             inp_wrd = jaconv.hiragana2julius(inp_wrd).split()
 
+    else:
+        if ds.source == 'phon':
+            inp_wrd = jaconv.hiragana2julius(inp_wrd).split()
+
     _input_ids = ds.source_tkn2ids(inp_wrd) + [ds.source_list.index('<EOW>')]
-    _output_words, _output_ids, _attentions = evaluate(
+    _output_words, _output_ids, _attentions, topvs = evaluate(
         encoder=encoder, decoder=decoder,
-        input_ids=_input_ids,
-        max_length=ds.maxlen,
-        source_vocab=ds.source_list,
-        target_vocab=ds.target_list,
-    )
+        input_ids=_input_ids, max_length=ds.maxlen,
+        source_vocab=ds.source_list, target_vocab=ds.target_list)
     dec_wrds = _output_words
 
     if isPrint:
-        print(f'出力:{dec_wrds}') # np.array(dec_vals)}')
-        #print(f'出力:{dec_wrds}, likelihood:{likelihood}') # np.array(dec_vals)}')
-    return dec_wrds, None
-    #return dec_wrds, likelihood
+        print(f'出力:{dec_wrds}') 
+    return dec_wrds, topvs
 
 
 def convert_ids2tensor(
@@ -140,16 +140,12 @@ def calc_accuracy(
     ok_count = 0
     for i in range(_dataset.__len__()):
         _input_ids, _target_ids = _dataset.__getitem__(i)
-        _output_words, _output_ids, _attentions = evaluate(
-            encoder=encoder,
-            decoder=decoder,
+        _output_words, _output_ids, _attentions, topvs = evaluate(
+            encoder=encoder, decoder=decoder,
             input_ids=_input_ids,
             max_length=max_length,
-            source_vocab=source_vocab,
-            target_vocab=target_vocab,
-            source_ids=source_ids,
-            target_ids=target_ids,
-        )
+            source_vocab=source_vocab, target_vocab=target_vocab,
+            source_ids=source_ids, target_ids=target_ids)
         ok_count += 1 if _target_ids == _output_ids else 0
         if (_target_ids != _output_ids) and (isPrint):
             print(i, _target_ids == _output_ids, _output_words, _input_ids, _target_ids)
@@ -158,6 +154,48 @@ def calc_accuracy(
 
 
 def evaluate(
+    encoder:torch.nn.Module, decoder:torch.nn.Module,
+    input_ids:list=None, source_vocab:list=None, target_vocab:list=None,
+    max_length:int=1, device:torch.device=device):
+
+    topvs = []
+    with torch.no_grad():
+        input_tensor = convert_ids2tensor(input_ids)
+        input_length = input_tensor.size()[0]
+        encoder_hid = encoder.initHidden()
+
+        encoder_outputs = torch.zeros(max_length, encoder.n_hid, device=device)
+
+        for ei in range(input_length):
+            encoder_out, encoder_hid = encoder(input_tensor[ei], encoder_hid)
+            encoder_outputs[ei] += encoder_out[0, 0]
+
+        decoder_inp = torch.tensor([[source_vocab.index('<SOW>')]], device=device)
+        decoder_hid = encoder_hid
+
+        decoded_words, decoded_ids = [], []  # decoded_ids を追加
+        decoder_attns = torch.zeros(max_length, max_length)
+
+        for di in range(max_length):
+            decoder_out, decoder_hid, decoder_attn = decoder(
+                decoder_inp, decoder_hid, encoder_outputs, device=device)
+            decoder_attns[di] = decoder_attn.data
+            topv, topi = decoder_out.data.topk(1)
+            topvs.append(float(topv.squeeze().detach().numpy())) #.numpy()[0])
+            #topvs.append(topv.squeeze().detach().numpy()[0]) #.numpy()[0])
+            decoded_ids.append(int(topi.squeeze().detach())) # decoded_ids に追加
+            if topi.item() == target_vocab.index('<EOW>'):
+                decoded_words.append('<EOW>')
+                break
+            else:
+                decoded_words.append(target_vocab[topi.item()])
+
+            decoder_inp = topi.squeeze().detach()
+
+        return decoded_words, decoded_ids, decoder_attns[:di + 1], topvs
+
+
+def evaluate_save(
     encoder:torch.nn.Module, decoder:torch.nn.Module,
     input_ids:list=None,
     source_vocab:list=None, target_vocab:list=None,
@@ -213,7 +251,7 @@ def check_a_dataset(
     ok_count = 0
     for i in range(_dataset.__len__()):
         _input_ids, _target_ids = _dataset.__getitem__(i)
-        _output_words, _output_ids, _attentions = evaluate(
+        _output_words, _output_ids, _attentions, topvs = evaluate(
             encoder=encoder, decoder=decoder,
             source_vocab=source_vocab, target_vocab=target_vocab,
             input_ids=_input_ids, max_length=max_length, device=device)
@@ -240,7 +278,7 @@ def check_vals_performance(
         for i in range(_dataset[_x].__len__()):
             #_input_ids, _target_ids = _dataset.__getitem__(i)
             _input_ids, _target_ids = _dataset[_x].__getitem__(i)
-            _output_words, _output_ids, _attentions = evaluate(
+            _output_words, _output_ids, _attentions, topvs = evaluate(
                 encoder=encoder, decoder=decoder,
                 source_vocab=source_vocab, target_vocab=target_vocab,
                 input_ids=_input_ids,
@@ -374,8 +412,7 @@ def dup_model_with_params(params:dict=params,
 # encoder2_optimizer, decoder2_optimizer = X['encoder_optimizer'], X['decoder_optimizer']
 # train_dataset2, val_dataset2 = X['train_dataset'], X['val_dataset']
 # ds2.__len__()
-def check_fushimi1999_words(encoder:torch.nn.Module,
-                            decoder:torch.nn.Module,
+def check_fushimi1999_words(encoder:torch.nn.Module, decoder:torch.nn.Module,
                             ds:torch.utils.data.Dataset,
                             fushimi1999_list:list=fushimi1999_list[:120],
                             cr_every:int=4):
@@ -385,8 +422,9 @@ def check_fushimi1999_words(encoder:torch.nn.Module,
 
         if wrd in ds.orth2info_dict:
             _inp = ds.orth2info_dict[wrd][ds.source]
-            _out = eval_input_seq2seq(ds=ds, encoder=encoder, decoder=decoder, inp_wrd=_inp, isPrint=False)
-            _out_wrd = _out[0][:-1]
+            _out, topvs = eval_input_seq2seq(ds=ds, encoder=encoder, decoder=decoder, inp_wrd=_inp, isPrint=False)
+            _out_wrd = _out[:-1]
+            #_out_wrd = _out[0][:-1]
             _tch = ds.orth2info_dict[wrd][ds.target]
             is_ok = _tch == _out_wrd
             if is_ok:
