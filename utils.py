@@ -626,7 +626,8 @@ def set_params_from_file(json_fname:str="",
 
     encoder_optimizer = params['optim_func'](encoder.parameters(), lr=params['lr'])
     decoder_optimizer = params['optim_func'](decoder.parameters(), lr=params['lr'])
-    params['loss_func'] = eval(params['loss_func'])()
+    if isinstance(params['loss_func'], str):
+        params['loss_func'] = eval(params['loss_func'])()
     #params['loss_func'] = str(params['loss_func'])
 
     return params, encoder, decoder, ds, train_dataset, val_dataset, \
@@ -685,15 +686,54 @@ def save_model_and_configs(
 
     encoder, decoder = configs['encoder'], configs['decoder']
     encoder_optimizer, decoder_optimizer = configs['encoder_optimizer'], configs['decoder_optimizer']
-    losses = models['losses']
+    #losses = models['losses']
+    losses = configs.get('losses', "")
+    train_accuracy = configs.get('train_accuracy', "")
+    val_accuracy = configs.get('val_accuracy', "")
+    dataset_name = configs.get('dataset_name',"")
+    traindata_size = configs.get('traindata_size')
+    stop_list = configs.get('stop_list', None)
+    epochs = configs.get('epochs', 0)
+    source = configs.get('source', "")
+    target = configs.get('target', "")
+    source_vocab = configs.get('source_vocab', [])
+    target_vocab = configs.get('target_vocab', [])
+    hidden_size = configs.get('hidden_size', 0)
+    lr = configs.get('lr', 0.)
+    teacher_forcing_ratio = configs.get('teacher_forcing_ratio', 0.)
+    random_seed = configs.get('random_seed', 0)
+    max_length = configs.get('max_length', 0)
+    source_vocab = configs.get('source_vocab', [])
+    target_vocab = configs.get('target_vocab', [])
+    N_train = configs.get('N_train', 0)
+    N_val = configs.get('N_val', 0)
 
     timestamp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
     torch.save({'encoder':encoder.state_dict(),
                 'decoder':decoder.state_dict(),
                 'encoder_optimizer': encoder_optimizer.state_dict(),
                 'decoder_optimizer': decoder_optimizer.state_dict(),
-                'configs':configs,
+                #'configs':configs,
                 'losses':losses,
+                'train_accuracy': train_accuracy,
+                'val_accuracy': val_accuracy,
+                'dataset_name': dataset_name,
+                'traindata_size' : traindata_size,
+                'stop_list': stop_list,
+                'epochs': epochs,
+                'source': source,
+                'target': target,
+                'source_vocab': source_vocab,
+                'target_vocab' :target_vocab,
+                'hidden_size': hidden_size,
+                'lr': lr,
+                'teacher_forcing_ratio': teacher_forcing_ratio,
+                'random_seed': random_seed,
+                'max_length': max_length,
+                'source_vocab': source_vocab,
+                'target_vocab': target_vocab,
+                'N_train': N_train,
+                'N_val': N_val,
                 'timestamp': timestamp}, fname)
 
     ret = torch.load(fname, map_location=torch.device(device))

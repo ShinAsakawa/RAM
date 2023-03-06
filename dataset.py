@@ -1406,3 +1406,72 @@ class SALA_Dataset(RAM_Dataset):
         _inp_ids = self.source_tkn2ids(_inp)
         _tch_ids = self.target_tkn2ids(_tch)
         return _inp_ids + [self.source_list.index('<EOW>')], _tch_ids + [self.target_list.index('<EOW>')]
+
+
+terao_json_gz_fname = 'RAM/terao_speech_erros_dict.json.gz'
+class terao_speech_error_dataset(RAM_Dataset):
+    def __init__(self,
+                 source:str="phon",
+                 target:str="errphon",
+                 terao_json_gz_fname:str=terao_json_gz_fname,
+                ):
+
+        super().__init__()
+        self.datasetname = 'terao_speech_error'
+        json_data_fname = terao_json_gz_fname
+        with gzip.open(json_data_fname, 'rb') as zipfile:
+            _X = json.loads(zipfile.read().decode('utf-8'))
+
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.source = source
+        self.target = target
+        self.orth_list = self.jchar_list
+
+        orth_maxlen, phon_maxlen = 0, 0
+        for idx in _X.keys():
+            orth_len = len(_X[idx]['orth'])
+            if orth_len > orth_maxlen:
+                orth_maxlen = orth_len
+            phon_len = len(_X[idx]["phon"])
+            if phon_len > phon_maxlen:
+                phon_maxlen = phon_len
+
+        # self.orth_maxlen = orth_maxlen + 1
+        # self.phon_maxlen = phon_maxlen + 1
+        self.orth_maxlen = 19
+        self.phon_maxlen = 19
+
+        if self.orth_maxlen > self.phon_maxlen:
+            self.maxlen = orth_maxlen
+        else:
+            self.maxlen = self.phon_maxlen
+
+        data_dict = {}
+        for k, v in _X.items():
+            idx = len(data_dict)
+            wrd = v['orth']
+            if wrd in data_dict:
+                print(f'{k} {wrd} duplicated. {v}')
+            wrd = v['orth']
+            data_dict[idx] = v
+        self.data_dict = data_dict
+        self.orth2info_dict = _X
+        #super().set_source_and_target_from_params(source=source, target=target)
+        self.source_list = self.phon_list
+        self.target_list = self.phon_list
+        self.source_ids2tkn = self.phon_ids2tkn
+        self.target_ids2tkn = self.phon_ids2tkn
+        self.source_tkn2ids = self.phon_tkn2ids
+        self.target_tkn2ids = self.phon_tkn2ids
+        
+
+    def __len__(self):
+        return len(self.data_dict)
+    
+    def __getitem__(self, idx:int, **kwargs):
+        _inp = self.data_dict[idx][self.source]
+        _tch = self.data_dict[idx][self.target]
+        _inp_ids = self.source_tkn2ids(_inp)
+        _tch_ids = self.target_tkn2ids(_tch)
+        return _inp_ids + [self.source_list.index('<EOW>')], _tch_ids + [self.target_list.index('<EOW>')]

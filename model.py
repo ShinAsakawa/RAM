@@ -260,8 +260,8 @@ def train_epochs(
     epochs:int=1,
     encoder:torch.nn.Module=None,
     decoder:torch.nn.Module=None,
-    encoder_optimizer:torch.optim=torch.optim, #.adam.Adam,
-    decoder_optimizer:torch.optim=torch.optim, #.adam.Adam,
+    encoder_optimizer:torch.optim=torch.optim,
+    decoder_optimizer:torch.optim=torch.optim,
     criterion:torch.nn.modules=torch.nn.NLLLoss(),
     source_vocab:list=None, target_vocab:list=None,
     source_ids:str=None, target_ids:list=None,
@@ -272,7 +272,9 @@ def train_epochs(
     train_dataset:torch.utils.data.Dataset=None,
     val_dataset:dict=None,
     max_length:int=1,
-    device=device)->list:
+    device=device,
+    acc_val:bool=False,  # エポック毎の訓練，検証両データの精度を返すか否か
+    )->list:
     '''`train_one_seq2seq()` を反復して呼び出してモデルを学習させる'''
 
     start_time = time.time()
@@ -280,6 +282,8 @@ def train_epochs(
     #criterion = params['loss_func']
 
     losses = []
+    accus = []
+    vals = []
     for epoch in range(epochs):
 
         if val_dataset != None:
@@ -313,16 +317,26 @@ def train_epochs(
             epoch_loss += loss
             ok_count += 1 if ok_flag else 0
 
-        losses.append(epoch_loss/train_dataset.__len__())
-        print(colored(f'エポック:{epoch:2d} 損失:{epoch_loss/train_dataset.__len__():.2f}', 'cyan', attrs=['bold']),
+        _loss = epoch_loss/train_dataset.__len__()
+        _accu = ok_count/train_dataset.__len__()
+
+        losses.append(_loss)
+        accus.append(_accu)
+        vals.append(_val)
+        print(colored(f'エポック:{epoch:2d} 損失:{_loss:.2f}', 'cyan', attrs=['bold']),
               colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}',
                       'cyan', attrs=['bold']),
-              colored(f'訓練データ精度:{ok_count/train_dataset.__len__():.3f}', 'cyan', attrs=['bold']),
+              colored(f'訓練データ精度:{_accu:.3f}', 'cyan', attrs=['bold']),
               colored(f'検証データ:{_val}', 'cyan', attrs=['bold'])
               )
 
-
-    return losses
+    params['losses'] = losses
+    params['train_accus'] = accus
+    params['val_accus'] = vals
+    if acc_val:
+        return losses, params
+    else:
+        return losses
 
 
 def train_epochs_with_config(configs:dict=None, verbose=False):
@@ -334,8 +348,7 @@ def train_epochs_with_config(configs:dict=None, verbose=False):
     decoder = configs.get('decoder')
     encoder_optimizer = configs.get('encoder_optimizer')
     decoder_optimizer = configs.get('decoder_optimizer')
-    max_length = configs.get('max_length') 
-    print(f'max_length:{max_length}')
+    max_length = configs.get('max_length')
     val_dataset = configs.get('val_dataset')
     #val_dataset = configs.get('val_dataset', None)
     train_dataset = configs.get('train_dataset', None)
@@ -400,14 +413,14 @@ def train_epochs_with_config(configs:dict=None, verbose=False):
             val_accuracy.append(_val_accuracy[0])
             print(
                 colored(f'エポック:{epoch:2d} 損失:{epoch_loss/train_dataset.__len__():.2f}', color=color, attrs=['bold']),
-                colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}', 
+                colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}',
                     color=color, attrs=['bold']),
                 colored(f'訓練データ精度:{_train_accuracy:.3f}', color=color, attrs=['bold']),
                 colored(f'検証データ:{_val_accuracy}', color=color, attrs=['bold']))
         else:
             print(
                 colored(f'エポック:{epoch:2d} 損失:{epoch_loss/train_dataset.__len__():.2f}', color=color, attrs=['bold']),
-                colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}', 
+                colored(f'{timeSince(start_time, (epoch+1) * train_dataset.__len__()/(epochs * train_dataset.__len__()))}',
                     color=color, attrs=['bold']),
                 colored(f'訓練データ精度:{_train_accuracy:.3f}', color=color, attrs=['bold']))
                 #colored(f'訓練データ精度:{ok_count/train_dataset.__len__():.3f}', color=color, attrs=['bold']))
