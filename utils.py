@@ -181,8 +181,8 @@ def evaluate(
                 decoder_inp, decoder_hid, encoder_outputs, device=device)
             decoder_attns[di] = decoder_attn.data
             topv, topi = decoder_out.data.topk(1)
-            topvs.append(float(topv.squeeze().detach().numpy())) #.numpy()[0])
-            #topvs.append(topv.squeeze().detach().numpy()[0]) #.numpy()[0])
+            topvs.append(float(topv.squeeze().detach().cpu().numpy())) #.numpy()[0])
+            #topvs.append(topv.squeeze().detach().cpu().numpy()[0]) #.numpy()[0])
             decoded_ids.append(int(topi.squeeze().detach())) # decoded_ids に追加
             if topi.item() == target_vocab.index('<EOW>'):
                 decoded_words.append('<EOW>')
