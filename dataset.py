@@ -212,13 +212,14 @@ class Psylex71_Dataset(RAM_Dataset):
                  source:str="orth",
                  target:str="phon",
                  max_words:int=20000,
-                 stop_list:list=fushimi1999_list[:120],
+                 white_list:list=fushimi1999_list[:120],
+                 stop_list:list=[] #fushimi1999_list[:120],
                 ):
 
         super().__init__()
         self.datasetname = 'psylex71'
         psylex71_data_fname = 'RAM/psylex71_data.gz'
-        vdrj_data_fname = 'RAM/vdrj_data.gz'
+        #vdrj_data_fname = 'RAM/vdrj_data.gz'
         with gzip.open(psylex71_data_fname, 'rb') as zipfile:
             _X = json.loads(zipfile.read().decode('utf-8'))
         psylex71_dict = _X['dict']
@@ -232,6 +233,21 @@ class Psylex71_Dataset(RAM_Dataset):
         self.orth_list = self.jchar_list
 
         data_dict, orth_maxlen, phon_maxlen = {}, 0, 0
+        self.white_list = white_list
+
+        for wrd in white_list:
+            idx = len(data_dict)
+            val = psylex71_dict[wrd]
+            data_dict[idx] = val
+
+            orth_len = len(psylex71_dict[wrd]['orth'])
+            if orth_len > orth_maxlen:
+                orth_maxlen = orth_len
+            phon_len = len(psylex71_dict[wrd]["phon"])
+            if phon_len > phon_maxlen:
+                phon_maxlen = phon_len
+
+
         for wrd in psylex71_freq:
             if not wrd in stop_list:
                 idx = len(data_dict)
@@ -278,7 +294,8 @@ class VDRJ_Dataset(RAM_Dataset):
                  target:str="phon",
                  max_words:int=20000,
                  cover_rate:float=0.99,
-                 stop_list:list=fushimi1999_list[:120]):
+                 stop_list:list=[]):
+                 #stop_list:list=fushimi1999_list[:120]):
 
         super().__init__()
         self.datasetname = 'vdrj'
@@ -300,8 +317,7 @@ class VDRJ_Dataset(RAM_Dataset):
         # data_dict の key はインデックス番号とする
         data_dict, orth_maxlen, phon_maxlen = {}, 0, 0
         for k, v in vdrj_dict.items():
-            wrd = v['lexeme']
-            if not wrd in stop_list:
+            if not v['lexeme'] in stop_list:
                 idx = len(data_dict)
                 data_dict[idx] = v
 
@@ -325,7 +341,8 @@ class VDRJ_Dataset(RAM_Dataset):
 
         self.data_dict = data_dict
         orth2info_dict = {}
-        for k, v in vdrj_dict.items():
+        for k, v in data_dict.items():
+        #for k, v in vdrj_dict.items():
             orth = v['lexeme']
             orth2info_dict[orth] = v
         self.orth2info_dict = orth2info_dict
@@ -1464,14 +1481,241 @@ class terao_speech_error_dataset(RAM_Dataset):
         self.target_ids2tkn = self.phon_ids2tkn
         self.source_tkn2ids = self.phon_tkn2ids
         self.target_tkn2ids = self.phon_tkn2ids
-        
+
 
     def __len__(self):
         return len(self.data_dict)
-    
+
     def __getitem__(self, idx:int, **kwargs):
         _inp = self.data_dict[idx][self.source]
         _tch = self.data_dict[idx][self.target]
         _inp_ids = self.source_tkn2ids(_inp)
         _tch_ids = self.target_tkn2ids(_tch)
         return _inp_ids + [self.source_list.index('<EOW>')], _tch_ids + [self.target_list.index('<EOW>')]
+
+
+class uema_speech_error_dataset(RAM_Dataset):
+    def __init__(self,
+                 source:str="phon",
+                 target:str="errphon",
+                 max_words:int=None):
+
+        super().__init__()
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.joyo_chars = super().get_joyo_chars()
+        self.source = source
+        self.target = target
+        self.orth_list = self.jchar_list
+
+        self.orth_maxlen = 19
+        self.phon_maxlen = 19
+
+        self.test_dict = {
+            0: {'orth': 'てれび',  'phon': ['t', 'e', 'r', 'e', 'b', 'i'],  'errひら': 'わべり',  'errphon': ['w', 'a', 'b', 'e', 'r', 'i'],  'ひら': 'てれび'},
+            1: {'orth': 'とびら',  'phon': ['t', 'o', 'b', 'i', 'r', 'a'],  'errひら': 'くびら',  'errphon': ['k', 'u', 'b', 'i', 'r', 'a'],  'ひら': 'とびら'},
+            2: {'orth': 'ものみ',  'phon': ['m', 'o', 'n', 'o', 'm', 'i'],  'errひら': 'ものみ',  'errphon': ['m', 'o', 'n', 'o', 'm', 'i'],  'ひら': 'ものみ'},
+            3: {'orth': 'こゆび',  'phon': ['k', 'o', 'y', 'u', 'b', 'i'],  'errひら': 'こゆび',  'errphon': ['k', 'o', 'y', 'u', 'b', 'i'],  'ひら': 'こゆび'},
+            4: {'orth': 'しょくじ',  'phon': ['sh', 'o', 'k', 'u', 'j', 'i'],  'errひら': 'そくじ',  'errphon': ['s', 'o', 'k', 'u', 'j', 'i'],  'ひら': 'しょくじ'},
+            5: {'orth': 'よぼう',  'phon': ['y', 'o', 'b', 'o:'],  'errひら': 'よぼう',  'errphon': ['y', 'o', 'b', 'o:'],  'ひら': 'よぼう'},
+            6: {'orth': 'でんわ',  'phon': ['d', 'e', 'N', 'w', 'a'],  'errひら': 'げんわ',  'errphon': ['g', 'e', 'N', 'w', 'a'],  'ひら': 'でんわ'},
+            7: {'orth': 'ひはん',  'phon': ['h', 'i', 'h', 'a', 'N'],  'errひら': 'いかん',  'errphon': ['i', 'k', 'a', 'N'],  'ひら': 'ひはん'},
+            8: {'orth': 'はだか',  'phon': ['h', 'a', 'd', 'a', 'k', 'a'],  'errひら': 'はだか',  'errphon': ['h', 'a', 'd', 'a', 'k', 'a'],  'ひら': 'はだか'},
+            9: {'orth': 'たいこ',  'phon': ['t', 'a', 'i', 'k', 'o'],  'errひら': 'かいこ',  'errphon': ['k', 'a', 'i', 'k', 'o'],  'ひら': 'たいこ'},
+            10: {'orth': 'つごう', 'phon': ['ts', 'u', 'g', 'o:'],  'errひら': 'つごう',  'errphon': ['ts', 'u', 'g', 'o:'],  'ひら': 'つごう'},
+            11: {'orth': 'うでわ',  'phon': ['u', 'd', 'e', 'w', 'a'],  'errひら': 'うでわ',  'errphon': ['u', 'd', 'e', 'w', 'a'],  'ひら': 'うでわ'},
+            12: {'orth': 'よてい',  'phon': ['y', 'o', 't', 'e', 'i'],  'errひら': 'よけい',  'errphon': ['y', 'o', 'k', 'e', 'i'],  'ひら': 'よてい'},
+            13: {'orth': 'めぼし',  'phon': ['m', 'e', 'b', 'o', 'sh', 'i'],  'errひら': 'めも',  'errphon': ['m', 'e', 'm', 'o'],  'ひら': 'めぼし'},
+            14: {'orth': 'めぼし',  'phon': ['m', 'e', 'b', 'o', 'sh', 'i'],  'errひら': 'めもし',  'errphon': ['m', 'e', 'm', 'o', 'sh', 'i'],  'ひら': 'めぼし'},
+            15: {'orth': 'ていど',  'phon': ['t', 'e', 'i', 'd', 'o'],  'errひら': 'けんおん',  'errphon': ['k', 'e', 'N', 'o', 'N'],  'ひら': 'ていど'},
+            16: {'orth': 'くるま',  'phon': ['k', 'u', 'r', 'u', 'm', 'a'],  'errひら': 'くるま',  'errphon': ['k', 'u', 'r', 'u', 'm', 'a'],  'ひら': 'くるま'},
+            17: {'orth': 'ききめ',  'phon': ['k', 'i', 'k', 'i', 'm', 'e'],  'errひら': 'ききめ',  'errphon': ['k', 'i', 'k', 'i', 'm', 'e'],  'ひら': 'ききめ'},
+            18: {'orth': 'しゃしん',  'phon': ['sh', 'a', 'sh', 'i', 'N'],  'errひら': 'しゃ',  'errphon': ['sh', 'a'],  'ひら': 'しゃしん'},
+            19: {'orth': 'しゃじ', 'phon': ['sh', 'a', 'j', 'i'],  'errひら': 'しゃじ',  'errphon': ['sh', 'a', 'j', 'i'],  'ひら': 'しゃじ'},
+            20: {'orth': 'あひる',  'phon': ['a', 'h', 'i', 'r', 'u'],  'errひら': 'あひる',  'errphon': ['a', 'h', 'i', 'r', 'u'],  'ひら': 'あひる'},
+            21: {'orth': 'ぐもん',  'phon': ['g', 'u', 'm', 'o', 'N'],  'errひら': 'ぐもん',  'errphon': ['g', 'u', 'm', 'o', 'N'],  'ひら': 'ぐもん'},
+            22: {'orth': 'ろんり',  'phon': ['r', 'o', 'N', 'r', 'i'],  'errひら': 'のんき',  'errphon': ['n', 'o', 'N', 'k', 'i'],  'ひら': 'ろんり'},
+            23: {'orth': 'わがし',  'phon': ['w', 'a', 'g', 'a', 'sh', 'i'],  'errひら': 'わらび',  'errphon': ['w', 'a', 'r', 'a', 'b', 'i'],  'ひら': 'わがし'},
+            24: {'orth': 'くすり',  'phon': ['k', 'u', 's', 'u', 'r', 'i'],  'errひら': 'くすり',  'errphon': ['k', 'u', 's', 'u', 'r', 'i'],  'ひら': 'くすり'},
+            25: {'orth': 'ちゃしつ',  'phon': ['ch', 'a', 'sh', 'i', 'ts', 'u'],  'errひら': 'さん、さ、なんとか',  'errphon': ['s', 'a', 'N、', 's', 'a、', 'n', 'a', 'N', 't', 'o', 'k', 'a'],  'ひら': 'ちゃしつ'},
+            26: {'orth': 'めやす',  'phon': ['m', 'e', 'y', 'a', 's', 'u'],  'errひら': 'みな',  'errphon': ['m', 'i', 'n', 'a'],  'ひら': 'めやす'},
+            27: {'orth': 'めやす',  'phon': ['m', 'e', 'y', 'a', 's', 'u'],  'errひら': 'みばす',  'errphon': ['m', 'i', 'b', 'a', 's', 'u'],  'ひら': 'めやす'},
+            28: {'orth': 'からだ',  'phon': ['k', 'a', 'r', 'a', 'd', 'a'],  'errひら': 'からだ',  'errphon': ['k', 'a', 'r', 'a', 'd', 'a'],  'ひら': 'からだ'},
+            29: {'orth': 'さかき',  'phon': ['s', 'a', 'k', 'a', 'k', 'i'],  'errひら': 'かかく',  'errphon': ['k', 'a', 'k', 'a', 'k', 'u'],  'ひら': 'さかき'},
+            30: {'orth': 'さかき',  'phon': ['s', 'a', 'k', 'a', 'k', 'i'],  'errひら': 'さかく',  'errphon': ['s', 'a', 'k', 'a', 'k', 'u'],  'ひら': 'さかき'},
+            31: {'orth': 'きやく',  'phon': ['k', 'i', 'y', 'a', 'k', 'u'],  'errひら': 'きやく',  'errphon': ['k', 'i', 'y', 'a', 'k', 'u'],  'ひら': 'きやく'},
+            32: {'orth': 'ひでん',  'phon': ['h', 'i', 'd', 'e', 'N'],  'errひら': 'きい',  'errphon': ['k', 'i:'],  'ひら': 'ひでん'},
+            33: {'orth': 'ひでん',  'phon': ['h', 'i', 'd', 'e', 'N'],  'errひら': 'きらく',  'errphon': ['k', 'i', 'r', 'a', 'k', 'u'],  'ひら': 'ひでん'},
+            34: {'orth': 'りゆう',  'phon': ['r', 'i', 'y', 'u:'],  'errひら': 'むゆう',  'errphon': ['m', 'u', 'y', 'u:'],  'ひら': 'りゆう'},
+            35: {'orth': 'ぶらく',  'phon': ['b', 'u', 'r', 'a', 'k', 'u'], 'errひら': 'めらく',  'errphon': ['m', 'e', 'r', 'a', 'k', 'u'],  'ひら': 'ぶらく'},
+            36: {'orth': 'あぶら',  'phon': ['a', 'b', 'u', 'r', 'a'],  'errひら': 'あぶら',  'errphon': ['a', 'b', 'u', 'r', 'a'],  'ひら': 'あぶら'},
+            37: {'orth': 'ゆびわ',  'phon': ['y', 'u', 'b', 'i', 'w', 'a'],  'errひら': 'ひび、ゆ、びわ',  'errphon': ['h', 'i', 'b', 'i、', 'y', 'u、', 'b', 'i', 'w', 'a'],
+                 'ひら': 'ゆびわ'},
+            38: {'orth': 'てがみ',  'phon': ['t', 'e', 'g', 'a', 'm', 'i'],  'errひら': 'てがみ',  'errphon': ['t', 'e', 'g', 'a', 'm', 'i'],  'ひら': 'てがみ'},
+            39: {'orth': 'とりい',  'phon': ['t', 'o', 'r', 'i:'],  'errひら': 'こりい',  'errphon': ['k', 'o', 'r', 'i:'],  'ひら': 'とりい'},
+            40: {'orth': 'かしつ',  'phon': ['k', 'a', 'sh', 'i', 'ts', 'u'],  'errひら': 'かしく',  'errphon': ['k', 'a', 'sh', 'i', 'k', 'u'],  'ひら': 'かしつ'},
+            41: {'orth': 'のい',  'phon': ['n', 'o', 'i'],  'errひら': 'いの',  'errphon': ['i', 'n', 'o'],  'ひら': 'のい'},
+            42: {'orth': 'のい',  'phon': ['n', 'o', 'i'],  'errひら': 'いか',  'errphon': ['i', 'k', 'a'],  'ひら': 'のい'},
+            43: {'orth': 'のい',  'phon': ['n', 'o', 'i'],  'errひら': 'いぬ',  'errphon': ['i', 'n', 'u'],  'ひら': 'のい'},
+            44: {'orth': 'のい',  'phon': ['n', 'o', 'i'],  'errひら': 'いか',  'errphon': ['i', 'k', 'a'],  'ひら': 'のい'},
+            45: {'orth': 'のい',  'phon': ['n', 'o', 'i'],  'errひら': 'いろり',  'errphon': ['i', 'r', 'o', 'r', 'i'],  'ひら': 'のい'},
+            46: {'orth': 'びげ',  'phon': ['b', 'i', 'g', 'e'],  'errひら': 'みじえ',  'errphon': ['m', 'i', 'j', 'i', 'e'],  'ひら': 'びげ'},
+            47: {'orth': 'じず',  'phon': ['j', 'i', 'z', 'u'],  'errひら': 'いぬ？とはでない',  'errphon': ['i', 'n', 'u？', 't', 'o', 'h', 'a', 'd', 'e', 'n', 'a', 'i'],  'ひら': 'じず'},
+            48: {'orth': 'えも',  'phon': ['e', 'm', 'o'],  'errひら': 'えも',  'errphon': ['e', 'm', 'o'],  'ひら': 'えも'},
+            49: {'orth': 'すお',  'phon': ['s', 'u', 'o'],  'errひら': 'すお',  'errphon': ['s', 'u', 'o'],  'ひら': 'すお'},
+            50: {'orth': 'きゃし',  'phon': ['ky', 'a', 'sh', 'i'],  'errひら': 'きゃし',  'errphon': ['ky', 'a', 'sh', 'i'],  'ひら': 'きゃし'},
+            51: {'orth': 'のゆ',  'phon': ['n', 'o', 'y', 'u'],  'errひら': 'のり',  'errphon': ['n', 'o', 'r', 'i'],  'ひら': 'のゆ'},
+            52: {'orth': 'のゆ',  'phon': ['n', 'o', 'y', 'u'],  'errひら': 'のじ',  'errphon': ['n', 'o', 'j', 'i'],  'ひら': 'のゆ'},
+            53: {'orth': 'けぼ',  'phon': ['k', 'e', 'b', 'o'],  'errひら': 'けぼ',  'errphon': ['k', 'e', 'b', 'o'],  'ひら': 'けぼ'},
+            54: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'じゃみ',  'errphon': ['j', 'a', 'm', 'i'],  'ひら': 'やび'},
+            55: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'やけ',  'errphon': ['y', 'a', 'k', 'e'],  'ひら': 'やび'},
+            56: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'やけ',  'errphon': ['y', 'a', 'k', 'e'],  'ひら': 'やび'},
+            57: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'び',  'errphon': ['b', 'i'],  'ひら': 'やび'},
+            58: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'か',  'errphon': ['k', 'a'],  'ひら': 'やび'},
+            59: {'orth': 'けぐ',  'phon': ['k', 'e', 'g', 'u'],  'errひら': 'けぐ',  'errphon': ['k', 'e', 'g', 'u'],  'ひら': 'けぐ'},
+            60: {'orth': 'ばべ',  'phon': ['b', 'a', 'b', 'e'],  'errひら': 'ばび',  'errphon': ['b', 'a', 'b', 'i'],  'ひら': 'ばべ'},
+            61: {'orth': 'ばべ',  'phon': ['b', 'a', 'b', 'e'],  'errひら': 'ばべ',  'errphon': ['b', 'a', 'b', 'e'],  'ひら': 'ばべ'},
+            62: {'orth': 'けひ',  'phon': ['k', 'e', 'h', 'i'],  'errひら': 'ちょっと、けんじ',  'errphon': ['ch', 'o', 'q', 't', 'o、', 'k', 'e', 'N', 'j', 'i'],  'ひら': 'けひ'},
+            63: {'orth': 'ゆち',  'phon': ['y', 'u', 'ch', 'i'],  'errひら': 'ゆ',  'errphon': ['y', 'u'],  'ひら': 'ゆち'},
+            64: {'orth': 'ゆち',  'phon': ['y', 'u', 'ch', 'i'],  'errひら': 'ち',  'errphon': ['ch', 'i'],  'ひら': 'ゆち'}}
+
+        self.data_dict = self.test_dict
+        orth2info_dict = {}
+        for k, v in self.data_dict.items():
+            orth2info_dict[v['orth']] = v
+        self.orth2info_dict = orth2info_dict
+
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.source_list = self.phon_list
+        self.target_list = self.phon_list
+        self.source_ids2tkn = self.phon_ids2tkn
+        self.target_ids2tkn = self.phon_ids2tkn
+        self.source_tkn2ids = self.phon_tkn2ids
+        self.target_tkn2ids = self.phon_tkn2ids
+
+        orth2info_dict = {}
+        for k, v in self.test_dict.items():
+            orth = v['orth']
+            orth2info_dict[orth] = v
+        self.orth2info_dict = orth2info_dict
+        super().set_source_and_target_from_params(source=source, target=target)
+
+
+    def __len__(self)->int:
+        return len(self.test_dict)
+
+    # def __getitem__(self, idx:int):
+    #     src = self.test_dict[idx]['phon']
+    #     tgt = self.test_dict[idx]['errphon']
+    #     return src, tgt
+
+    def __getitem__(self, idx:int, **kwargs):
+        _inp = self.test_dict[idx][self.source]
+        _tch = self.test_dict[idx][self.target]
+        _inp_ids = self.source_tkn2ids(_inp)
+        _tch_ids = self.target_tkn2ids(_tch)
+        return _inp_ids + [self.source_list.index('<EOW>')], _tch_ids + [self.target_list.index('<EOW>')]
+
+"""
+# 以下は，直上の uema_Dataset 作成時の作業
+import jaconv
+import pandas as pd
+
+uema_salar29_df = pd.read_excel('../Phonological dysphasia(Wilshire,2004に類似例）.xlsx', sheet_name='単語復唱')
+uema_salar31_df = pd.read_excel('../Phonological dysphasia(Wilshire,2004に類似例）.xlsx', sheet_name='非語復唱')
+
+uema_salar29 = uema_salar29_df[['SALA-R29','反応']]
+uema_salar31 = uema_salar31_df[['Unnamed: 1','反応']]
+
+_x31, _x29 = uema_salar31.to_dict(orient='index') , uema_salar29.to_dict(orient='index')
+X = {}
+for k, v in _x29.items():
+    X[v['SALA-R29']] = v['反応']
+    #print(v['SALA-R29'])
+for k, v in _x31.items():
+    X[v['Unnamed: 1']] = v['反応']
+# for k, v in X.items():
+#     print(k, v)
+
+uema_data ={
+     1:('てれび','わべり'),
+     2:('とびら','くびら'),
+     3:('ものみ','ものみ'),
+     4:('こゆび','こゆび'),
+     5:('しょくじ','そくじ'),
+     6:('よぼう','よぼう'),
+     7:('でんわ','げんわ'),
+     8:('ひはん','いかん'),
+     9:('はだか','はだか'),
+    10:('たいこ','かいこ'),
+    11:('つごう','つごう'),
+    12:('うでわ','うでわ'),
+    13:('よてい','よけい'),
+    14:('めぼし','めも'),
+    15:('めぼし','めもし'),
+    16:('ていど','けんおん'),
+    17:('くるま','くるま'),
+    18:('ききめ','ききめ'),
+    19:('しゃしん','しゃ'),
+    20:('しゃじ','しゃじ'),
+    21:('あひる','あひる'),
+    22:('ぐもん','ぐもん'),
+    23:('ろんり','のんき'),
+    24:('わがし','わらび'),
+    25:('くすり', 'くすり'),
+    26:('ちゃしつ','さん、さ、なんとか'),
+    27:('めやす','みな'),
+    28:('めやす','みばす'),
+    29:('からだ','からだ'),
+    30:('さかき','かかく'),
+    31:('さかき','さかく'),
+    32:('きやく','きやく'),
+    33:('ひでん','きい'),
+    34:('ひでん','きらく'),
+    35:('りゆう','むゆう'),
+    36:('ぶらく','めらく'),
+    37:('あぶら','あぶら'),
+    38:('ゆびわ','ひび、ゆ、びわ'),
+    39:('てがみ','てがみ'),
+    40:('とりい','こりい'),
+    41:('かしつ','かしく'),
+    42:('のい','いの'),
+    43:('のい','いか'),
+    44:('のい','いぬ'),
+    45:('のい','いか'),
+    46:('のい','いろり'),
+    47:('びげ','みじえ'),
+    48:('じず', 'いぬ？とはでない'),
+    49:('えも','えも'),
+    50:('すお', 'すお'),
+    51:('きゃし', 'きゃし'),
+    52:('のゆ', 'のり'),
+    53:('のゆ','のじ'),
+    54:('けぼ', 'けぼ'),
+    55:('やび', 'じゃみ'),
+    56:('やび', 'やけ'),
+    57:('やび', 'やけ'),
+    58:('やび', 'び'),
+    59:('やび', 'か'),
+    60:('けぐ', 'けぐ'),
+    61:('ばべ', 'ばび'),
+    62:('ばべ','ばべ'),
+    63:('けひ','ちょっと、けんじ'),
+    64:('ゆち', 'ゆ'),
+    65:('ゆち', 'ち'),
+}
+
+uema_data2 = {}
+for i, (k,v) in enumerate(uema_data.items()):
+    wrd = v[0]
+    phon = jaconv.hiragana2julius(wrd).split()
+    errhira = v[1]
+    errphon = jaconv.hiragana2julius(errhira).split()
+    uema_data2[i] = {'orth':v[0],
+                     'phon': phon,
+                     'errひら': errhira,
+                     'errphon': errphon,
+                    }
+#uema_data2
+"""

@@ -255,6 +255,7 @@ def train_one_seq2seq(
 
 
 from .utils import *
+import copy
 
 def train_epochs(
     epochs:int=1,
@@ -278,8 +279,8 @@ def train_epochs(
     '''`train_one_seq2seq()` を反復して呼び出してモデルを学習させる'''
 
     start_time = time.time()
-
     #criterion = params['loss_func']
+    params = copy.deepcopy(params)
 
     losses = []
     accus = []
