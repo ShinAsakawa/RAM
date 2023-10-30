@@ -5,7 +5,7 @@ import json
 import os
 import sys
 import re
-import MeCab
+#import MeCab
 
 from IPython import get_ipython
 isColab =  'google.colab' in str(get_ipython())
