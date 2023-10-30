@@ -9,25 +9,25 @@ import MeCab
 
 from IPython import get_ipython
 isColab =  'google.colab' in str(get_ipython())
-if isColab:
-    mecab_yomi = MeCab.Tagger('-Oyomi').parse
-else:
-	mecab_dic_dirs = {
-	    'Pasiphae': '/usr/local/lib/mecab/dic/mecab-ipadic-neologd',
-	    'Sinope':' /opt/homebrew/lib/mecab/dic/ipadic',
-	    'Leda': '/usr/local/lib/mecab/dic/ipadic',
-	    'colab': '/usr/share/mecab/dic/ipadic'
-	}
+#if isColab:
+#    mecab_yomi = MeCab.Tagger('-Oyomi').parse
+#else:
+#	mecab_dic_dirs = {
+#	    'Pasiphae': '/usr/local/lib/mecab/dic/mecab-ipadic-neologd',
+#	    'Sinope':' /opt/homebrew/lib/mecab/dic/ipadic',
+#	    'Leda': '/usr/local/lib/mecab/dic/ipadic',
+#	    'colab': '/usr/share/mecab/dic/ipadic'
+#	}
 
 
 hostname = 'colab' if isColab else os.uname().nodename.split('.')[0]
-if hostname == 'colab':
-    wakati = MeCab.Tagger('-Owakati').parse
-    mecab_yomi = MeCab.Tagger('-Oyomi').parse
-else:
-    mecab_dic_dir = mecab_dic_dirs[hostname]
-    wakati = MeCab.Tagger(f'-Owakati -d {mecab_dic_dir}').parse
-    mecab_yomi = MeCab.Tagger(f'-Oyomi -d {mecab_dic_dir}').parse
+#if hostname == 'colab':
+#    wakati = MeCab.Tagger('-Owakati').parse
+#    mecab_yomi = MeCab.Tagger('-Oyomi').parse
+#else:
+#    mecab_dic_dir = mecab_dic_dirs[hostname]
+#    wakati = MeCab.Tagger(f'-Owakati -d {mecab_dic_dir}').parse
+#    mecab_yomi = MeCab.Tagger(f'-Oyomi -d {mecab_dic_dir}').parse
 
 
 from .fushimi1999 import _fushimi1999_list
@@ -45,7 +45,7 @@ class RAM_Dataset(torch.utils.data.Dataset):
     def __init__(self,
                  source:str="orth",
                  target:str="phon",
-                 mecab_yomi=mecab_yomi,
+                 #mecab_yomi=mecab_yomi,
                  max_words:int=200000):
         super().__init__()
 
@@ -54,7 +54,7 @@ class RAM_Dataset(torch.utils.data.Dataset):
         self.joyo_list = self.get_joyo_chars()
         self.source=source
         self.target=target
-        self.yomi=mecab_yomi
+        #self.yomi=mecab_yomi
 
         self.orth_list = self.joyo_list
         self.max_words = max_words
