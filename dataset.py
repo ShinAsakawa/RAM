@@ -9,25 +9,25 @@ import re
 
 from IPython import get_ipython
 isColab =  'google.colab' in str(get_ipython())
-#if isColab:
-#    mecab_yomi = MeCab.Tagger('-Oyomi').parse
-#else:
-#	mecab_dic_dirs = {
-#	    'Pasiphae': '/usr/local/lib/mecab/dic/mecab-ipadic-neologd',
-#	    'Sinope':' /opt/homebrew/lib/mecab/dic/ipadic',
-#	    'Leda': '/usr/local/lib/mecab/dic/ipadic',
-#	    'colab': '/usr/share/mecab/dic/ipadic'
-#	}
+# if isColab:
+#     mecab_yomi = MeCab.Tagger('-Oyomi').parse
+# else:
+# 	mecab_dic_dirs = {
+# 	    'Pasiphae': '/usr/local/lib/mecab/dic/mecab-ipadic-neologd',
+# 	    'Sinope':' /opt/homebrew/lib/mecab/dic/ipadic',
+# 	    'Leda': '/usr/local/lib/mecab/dic/ipadic',
+# 	    'colab': '/usr/share/mecab/dic/ipadic'
+# 	}
 
 
 hostname = 'colab' if isColab else os.uname().nodename.split('.')[0]
-#if hostname == 'colab':
-#    wakati = MeCab.Tagger('-Owakati').parse
-#    mecab_yomi = MeCab.Tagger('-Oyomi').parse
-#else:
-#    mecab_dic_dir = mecab_dic_dirs[hostname]
-#    wakati = MeCab.Tagger(f'-Owakati -d {mecab_dic_dir}').parse
-#    mecab_yomi = MeCab.Tagger(f'-Oyomi -d {mecab_dic_dir}').parse
+# if hostname == 'colab':
+#     wakati = MeCab.Tagger('-Owakati').parse
+#     mecab_yomi = MeCab.Tagger('-Oyomi').parse
+# else:
+#     mecab_dic_dir = mecab_dic_dirs[hostname]
+#     wakati = MeCab.Tagger(f'-Owakati -d {mecab_dic_dir}').parse
+#     mecab_yomi = MeCab.Tagger(f'-Oyomi -d {mecab_dic_dir}').parse
 
 
 from .fushimi1999 import _fushimi1999_list
@@ -97,9 +97,9 @@ class RAM_Dataset(torch.utils.data.Dataset):
             for ch in _mora_wakachi:
                 if ch in self.phon_list:
                     _juli_new.append(ch)
-                else:
-                    hira_ch_yomi = jaconv.kata2hira(self.yomi(ch).strip())
-                    _juli_new += jaconv.hiragana2julius(hira_ch_yomi).split()
+                # else:
+                #     hira_ch_yomi = jaconv.kata2hira(self.yomi(ch).strip())
+                #     _juli_new += jaconv.hiragana2julius(hira_ch_yomi).split()
             return _juli_new
 
 
@@ -219,7 +219,6 @@ class Psylex71_Dataset(RAM_Dataset):
         super().__init__()
         self.datasetname = 'psylex71'
         psylex71_data_fname = 'RAM/psylex71_data.gz'
-        #vdrj_data_fname = 'RAM/vdrj_data.gz'
         with gzip.open(psylex71_data_fname, 'rb') as zipfile:
             _X = json.loads(zipfile.read().decode('utf-8'))
         psylex71_dict = _X['dict']
@@ -294,8 +293,8 @@ class VDRJ_Dataset(RAM_Dataset):
                  target:str="phon",
                  max_words:int=20000,
                  cover_rate:float=0.99,
+                 white_list:list=[],
                  stop_list:list=[]):
-                 #stop_list:list=fushimi1999_list[:120]):
 
         super().__init__()
         self.datasetname = 'vdrj'
@@ -1435,9 +1434,15 @@ class terao_speech_error_dataset(RAM_Dataset):
 
         super().__init__()
         self.datasetname = 'terao_speech_error'
-        json_data_fname = terao_json_gz_fname
-        with gzip.open(json_data_fname, 'rb') as zipfile:
-            _X = json.loads(zipfile.read().decode('utf-8'))
+
+        if not os.path.exists(terao_json_gz_fname):
+            json_data_fname =  'RAM/terao_speech_erros_dict.json'
+            with open(json_data_fname, 'rb') as fp:
+                _X = json.loads(fp.read().decode('utf-8'))
+        else:
+            json_data_fname = terao_json_gz_fname
+            with gzip.open(json_data_fname, 'rb') as zipfile:
+                _X = json.loads(zipfile.read().decode('utf-8'))
 
         self.phon_list = super().get_phon_list()
         self.jchar_list = super().get_jchar_list()
@@ -1549,8 +1554,7 @@ class uema_speech_error_dataset(RAM_Dataset):
             34: {'orth': 'りゆう',  'phon': ['r', 'i', 'y', 'u:'],  'errひら': 'むゆう',  'errphon': ['m', 'u', 'y', 'u:'],  'ひら': 'りゆう'},
             35: {'orth': 'ぶらく',  'phon': ['b', 'u', 'r', 'a', 'k', 'u'], 'errひら': 'めらく',  'errphon': ['m', 'e', 'r', 'a', 'k', 'u'],  'ひら': 'ぶらく'},
             36: {'orth': 'あぶら',  'phon': ['a', 'b', 'u', 'r', 'a'],  'errひら': 'あぶら',  'errphon': ['a', 'b', 'u', 'r', 'a'],  'ひら': 'あぶら'},
-            37: {'orth': 'ゆびわ',  'phon': ['y', 'u', 'b', 'i', 'w', 'a'],  'errひら': 'ひび、ゆ、びわ',  'errphon': ['h', 'i', 'b', 'i、', 'y', 'u、', 'b', 'i', 'w', 'a'],
-                 'ひら': 'ゆびわ'},
+            37: {'orth': 'ゆびわ',  'phon': ['y', 'u', 'b', 'i', 'w', 'a'],  'errひら': 'ひび、ゆ、びわ',  'errphon': ['h', 'i', 'b', 'i、', 'y', 'u、', 'b', 'i', 'w', 'a'],  'ひら': 'ゆびわ'},
             38: {'orth': 'てがみ',  'phon': ['t', 'e', 'g', 'a', 'm', 'i'],  'errひら': 'てがみ',  'errphon': ['t', 'e', 'g', 'a', 'm', 'i'],  'ひら': 'てがみ'},
             39: {'orth': 'とりい',  'phon': ['t', 'o', 'r', 'i:'],  'errひら': 'こりい',  'errphon': ['k', 'o', 'r', 'i:'],  'ひら': 'とりい'},
             40: {'orth': 'かしつ',  'phon': ['k', 'a', 'sh', 'i', 'ts', 'u'],  'errひら': 'かしく',  'errphon': ['k', 'a', 'sh', 'i', 'k', 'u'],  'ひら': 'かしつ'},
@@ -1719,3 +1723,182 @@ for i, (k,v) in enumerate(uema_data.items()):
                     }
 #uema_data2
 """
+
+class uema_speech_error_dataset2_(RAM_Dataset):
+    def __init__(self,
+                 source:str="phon",
+                 target:str="errphon",
+                 max_words:int=None):
+
+        super().__init__()
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.joyo_chars = super().get_joyo_chars()
+        self.source = source
+        self.target = target
+        self.orth_list = self.jchar_list
+
+        self.orth_maxlen = 19
+        self.phon_maxlen = 19
+
+        self.test_dict = {
+            0: {'orth': 'てれび',  'phon': ['t', 'e', 'r', 'e', 'b', 'i'],  'errひら': 'わべり',  'errphon': ['w', 'a', 'b', 'e', 'r', 'i'],  'ひら': 'てれび'},
+            1: {'orth': 'とびら',  'phon': ['t', 'o', 'b', 'i', 'r', 'a'],  'errひら': 'くびら',  'errphon': ['k', 'u', 'b', 'i', 'r', 'a'],  'ひら': 'とびら'},
+            2: {'orth': 'ものみ',  'phon': ['m', 'o', 'n', 'o', 'm', 'i'],  'errひら': 'ものみ',  'errphon': ['m', 'o', 'n', 'o', 'm', 'i'],  'ひら': 'ものみ'},
+            3: {'orth': 'こゆび',  'phon': ['k', 'o', 'y', 'u', 'b', 'i'],  'errひら': 'こゆび',  'errphon': ['k', 'o', 'y', 'u', 'b', 'i'],  'ひら': 'こゆび'},
+            4: {'orth': 'しょくじ',  'phon': ['sh', 'o', 'k', 'u', 'j', 'i'],  'errひら': 'そくじ',  'errphon': ['s', 'o', 'k', 'u', 'j', 'i'],  'ひら': 'しょくじ'},
+            5: {'orth': 'よぼう',  'phon': ['y', 'o', 'b', 'o:'],  'errひら': 'よぼう',  'errphon': ['y', 'o', 'b', 'o:'],  'ひら': 'よぼう'},
+            6: {'orth': 'でんわ',  'phon': ['d', 'e', 'N', 'w', 'a'],  'errひら': 'げんわ',  'errphon': ['g', 'e', 'N', 'w', 'a'],  'ひら': 'でんわ'},
+            7: {'orth': 'ひはん',  'phon': ['h', 'i', 'h', 'a', 'N'],  'errひら': 'いかん',  'errphon': ['i', 'k', 'a', 'N'],  'ひら': 'ひはん'},
+            8: {'orth': 'はだか',  'phon': ['h', 'a', 'd', 'a', 'k', 'a'],  'errひら': 'はだか',  'errphon': ['h', 'a', 'd', 'a', 'k', 'a'],  'ひら': 'はだか'},
+            9: {'orth': 'たいこ',  'phon': ['t', 'a', 'i', 'k', 'o'],  'errひら': 'かいこ',  'errphon': ['k', 'a', 'i', 'k', 'o'],  'ひら': 'たいこ'},
+            10: {'orth': 'つごう', 'phon': ['ts', 'u', 'g', 'o:'],  'errひら': 'つごう',  'errphon': ['ts', 'u', 'g', 'o:'],  'ひら': 'つごう'},
+            11: {'orth': 'うでわ',  'phon': ['u', 'd', 'e', 'w', 'a'],  'errひら': 'うでわ',  'errphon': ['u', 'd', 'e', 'w', 'a'],  'ひら': 'うでわ'},
+            12: {'orth': 'よてい',  'phon': ['y', 'o', 't', 'e', 'i'],  'errひら': 'よけい',  'errphon': ['y', 'o', 'k', 'e', 'i'],  'ひら': 'よてい'},
+            13: {'orth': 'めぼし',  'phon': ['m', 'e', 'b', 'o', 'sh', 'i'],  'errひら': 'めも',  'errphon': ['m', 'e', 'm', 'o'],  'ひら': 'めぼし'},
+            14: {'orth': 'ていど',  'phon': ['t', 'e', 'i', 'd', 'o'],  'errひら': 'けんおん',  'errphon': ['k', 'e', 'N', 'o', 'N'],  'ひら': 'ていど'},
+            15: {'orth': 'くるま',  'phon': ['k', 'u', 'r', 'u', 'm', 'a'],  'errひら': 'くるま',  'errphon': ['k', 'u', 'r', 'u', 'm', 'a'],  'ひら': 'くるま'},
+            16: {'orth': 'ききめ',  'phon': ['k', 'i', 'k', 'i', 'm', 'e'],  'errひら': 'ききめ',  'errphon': ['k', 'i', 'k', 'i', 'm', 'e'],  'ひら': 'ききめ'},
+            17: {'orth': 'しゃしん',  'phon': ['sh', 'a', 'sh', 'i', 'N'],  'errひら': 'しゃ',  'errphon': ['sh', 'a'],  'ひら': 'しゃしん'},
+            18: {'orth': 'しゃじ', 'phon': ['sh', 'a', 'j', 'i'],  'errひら': 'しゃじ',  'errphon': ['sh', 'a', 'j', 'i'],  'ひら': 'しゃじ'},
+            19: {'orth': 'あひる',  'phon': ['a', 'h', 'i', 'r', 'u'],  'errひら': 'あひる',  'errphon': ['a', 'h', 'i', 'r', 'u'],  'ひら': 'あひる'},
+            20: {'orth': 'ぐもん',  'phon': ['g', 'u', 'm', 'o', 'N'],  'errひら': 'ぐもん',  'errphon': ['g', 'u', 'm', 'o', 'N'],  'ひら': 'ぐもん'},
+            21: {'orth': 'ろんり',  'phon': ['r', 'o', 'N', 'r', 'i'],  'errひら': 'のんき',  'errphon': ['n', 'o', 'N', 'k', 'i'],  'ひら': 'ろんり'},
+            22: {'orth': 'わがし',  'phon': ['w', 'a', 'g', 'a', 'sh', 'i'],  'errひら': 'わらび',  'errphon': ['w', 'a', 'r', 'a', 'b', 'i'],  'ひら': 'わがし'},
+            23: {'orth': 'くすり',  'phon': ['k', 'u', 's', 'u', 'r', 'i'],  'errひら': 'くすり',  'errphon': ['k', 'u', 's', 'u', 'r', 'i'],  'ひら': 'くすり'},
+            24: {'orth': 'ちゃしつ',  'phon': ['ch', 'a', 'sh', 'i', 'ts', 'u'],  'errひら': 'さん、さ、なんとか',  'errphon': ['s', 'a', 'N、', 's', 'a、', 'n', 'a', 'N', 't', 'o', 'k', 'a'],  'ひら': 'ちゃしつ'},
+            25: {'orth': 'めやす',  'phon': ['m', 'e', 'y', 'a', 's', 'u'],  'errひら': 'みな',  'errphon': ['m', 'i', 'n', 'a'],  'ひら': 'めやす'},
+            26: {'orth': 'からだ',  'phon': ['k', 'a', 'r', 'a', 'd', 'a'],  'errひら': 'からだ',  'errphon': ['k', 'a', 'r', 'a', 'd', 'a'],  'ひら': 'からだ'},
+            27: {'orth': 'さかき',  'phon': ['s', 'a', 'k', 'a', 'k', 'i'],  'errひら': 'かかく',  'errphon': ['k', 'a', 'k', 'a', 'k', 'u'],  'ひら': 'さかき'},
+            28: {'orth': 'きやく',  'phon': ['k', 'i', 'y', 'a', 'k', 'u'],  'errひら': 'きやく',  'errphon': ['k', 'i', 'y', 'a', 'k', 'u'],  'ひら': 'きやく'},
+            29: {'orth': 'ひでん',  'phon': ['h', 'i', 'd', 'e', 'N'],  'errひら': 'きい',  'errphon': ['k', 'i:'],  'ひら': 'ひでん'},
+            30: {'orth': 'りゆう',  'phon': ['r', 'i', 'y', 'u:'],  'errひら': 'むゆう',  'errphon': ['m', 'u', 'y', 'u:'],  'ひら': 'りゆう'},
+            31: {'orth': 'ぶらく',  'phon': ['b', 'u', 'r', 'a', 'k', 'u'], 'errひら': 'めらく',  'errphon': ['m', 'e', 'r', 'a', 'k', 'u'],  'ひら': 'ぶらく'},
+            32: {'orth': 'あぶら',  'phon': ['a', 'b', 'u', 'r', 'a'],  'errひら': 'あぶら',  'errphon': ['a', 'b', 'u', 'r', 'a'],  'ひら': 'あぶら'},
+            33: {'orth': 'ゆびわ',  'phon': ['y', 'u', 'b', 'i', 'w', 'a'],  'errひら': 'ひび、ゆ、びわ',  'errphon': ['h', 'i', 'b', 'i、', 'y', 'u、', 'b', 'i', 'w', 'a'],  'ひら': 'ゆびわ'},
+            34: {'orth': 'てがみ',  'phon': ['t', 'e', 'g', 'a', 'm', 'i'],  'errひら': 'てがみ',  'errphon': ['t', 'e', 'g', 'a', 'm', 'i'],  'ひら': 'てがみ'},
+            35: {'orth': 'とりい',  'phon': ['t', 'o', 'r', 'i:'],  'errひら': 'こりい',  'errphon': ['k', 'o', 'r', 'i:'],  'ひら': 'とりい'},
+            36: {'orth': 'かしつ',  'phon': ['k', 'a', 'sh', 'i', 'ts', 'u'],  'errひら': 'かしく',  'errphon': ['k', 'a', 'sh', 'i', 'k', 'u'],  'ひら': 'かしつ'},
+            37: {'orth': 'のい',  'phon': ['n', 'o', 'i'],  'errひら': 'いの',  'errphon': ['i', 'n', 'o'],  'ひら': 'のい'},
+            38: {'orth': 'びげ',  'phon': ['b', 'i', 'g', 'e'],  'errひら': 'みじえ',  'errphon': ['m', 'i', 'j', 'i', 'e'],  'ひら': 'びげ'},
+            39: {'orth': 'じず',  'phon': ['j', 'i', 'z', 'u'],  'errひら': 'いぬ？とはでない',  'errphon': ['i', 'n', 'u？', 't', 'o', 'h', 'a', 'd', 'e', 'n', 'a', 'i'],  'ひら': 'じず'},
+            40: {'orth': 'えも',  'phon': ['e', 'm', 'o'],  'errひら': 'えも',  'errphon': ['e', 'm', 'o'],  'ひら': 'えも'},
+            41: {'orth': 'すお',  'phon': ['s', 'u', 'o'],  'errひら': 'すお',  'errphon': ['s', 'u', 'o'],  'ひら': 'すお'},
+            42: {'orth': 'きゃし',  'phon': ['ky', 'a', 'sh', 'i'],  'errひら': 'きゃし',  'errphon': ['ky', 'a', 'sh', 'i'],  'ひら': 'きゃし'},
+            43: {'orth': 'のゆ',  'phon': ['n', 'o', 'y', 'u'],  'errひら': 'のり',  'errphon': ['n', 'o', 'r', 'i'],  'ひら': 'のゆ'},
+            44: {'orth': 'けぼ',  'phon': ['k', 'e', 'b', 'o'],  'errひら': 'けぼ',  'errphon': ['k', 'e', 'b', 'o'],  'ひら': 'けぼ'},
+            45: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'じゃみ',  'errphon': ['j', 'a', 'm', 'i'],  'ひら': 'やび'},
+            46: {'orth': 'やび',  'phon': ['y', 'a', 'b', 'i'],  'errひら': 'やけ',  'errphon': ['y', 'a', 'k', 'e'],  'ひら': 'やび'},
+            47: {'orth': 'けぐ',  'phon': ['k', 'e', 'g', 'u'],  'errひら': 'けぐ',  'errphon': ['k', 'e', 'g', 'u'],  'ひら': 'けぐ'},
+            48: {'orth': 'ばべ',  'phon': ['b', 'a', 'b', 'e'],  'errひら': 'ばび',  'errphon': ['b', 'a', 'b', 'i'],  'ひら': 'ばべ'},
+            49: {'orth': 'けひ',  'phon': ['k', 'e', 'h', 'i'],  'errひら': 'ちょっと、けんじ',  'errphon': ['ch', 'o', 'q', 't', 'o、', 'k', 'e', 'N', 'j', 'i'],  'ひら': 'けひ'},
+            50: {'orth': 'ゆち',  'phon': ['y', 'u', 'ch', 'i'],  'errひら': 'ゆ',  'errphon': ['y', 'u'],  'ひら': 'ゆち'},
+        }
+
+
+        self.data_dict = self.test_dict
+        orth2info_dict = {}
+        for k, v in self.data_dict.items():
+            orth2info_dict[v['orth']] = v
+        self.orth2info_dict = orth2info_dict
+
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.source_list = self.phon_list
+        self.target_list = self.phon_list
+        self.source_ids2tkn = self.phon_ids2tkn
+        self.target_ids2tkn = self.phon_ids2tkn
+        self.source_tkn2ids = self.phon_tkn2ids
+        self.target_tkn2ids = self.phon_tkn2ids
+
+        orth2info_dict = {}
+        for k, v in self.test_dict.items():
+            orth = v['orth']
+            orth2info_dict[orth] = v
+        self.orth2info_dict = orth2info_dict
+        super().set_source_and_target_from_params(source=source, target=target)
+
+
+    def __len__(self)->int:
+        return len(self.test_dict)
+
+    # def __getitem__(self, idx:int):
+    #     src = self.test_dict[idx]['phon']
+    #     tgt = self.test_dict[idx]['errphon']
+    #     return src, tgt
+
+    def __getitem__(self, idx:int, **kwargs):
+        _inp = self.test_dict[idx][self.source]
+        _tch = self.test_dict[idx][self.target]
+        _inp_ids = self.source_tkn2ids(_inp)
+        _tch_ids = self.target_tkn2ids(_tch)
+        return _inp_ids + [self.source_list.index('<EOW>')], _tch_ids + [self.target_list.index('<EOW>')]
+
+
+import pandas as pd
+class daimon_speech_error_dataset(RAM_Dataset):
+    def __init__(self,
+                 source:str="phon",
+                 target:str="errphon",
+                 max_words:int=None):
+
+        super().__init__()
+        import pandas as pd
+
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.joyo_chars = super().get_joyo_chars()
+        self.source = source
+        self.target = target
+        self.orth_list = self.jchar_list
+
+        self.orth_maxlen = 19
+        self.phon_maxlen = 19
+
+        pd = pd.read_excel('230331伝導失語に音韻的交換型のリストを復唱させた.xlsx', skiprows=[0,1,2])
+        _dict = pd[['刺激語','復唱反応']].to_dict(orient='index')
+        for i, w in enumerate([(v['刺激語'],v['復唱反応']) for k, v in _dict.items()]):
+            w0yomi = self.yomi(w[0]).strip()
+            w1yomi = self.yomi(w[1]).strip() if isinstance(w[1], str) else w0yomi
+
+            _dict[i]['orth'] = w[0]
+            _dict[i]['カナ'] = w0yomi
+            _dict[i]['ひら'] = jaconv.kata2hira(w0yomi)
+            _dict[i]['phon'] = jaconv.hiragana2julius(_dict[i]['ひら']).split()
+            _dict[i]['errカナ'] = w1yomi
+            _dict[i]['errひら'] = jaconv.kata2hira(w1yomi)
+            _dict[i]['errphon'] = jaconv.hiragana2julius(_dict[i]['errひら']).split()
+
+        self.data_dict = _dict
+        orth2info_dict = {}
+        for k, v in self.data_dict.items():
+            orth2info_dict[v['orth']] = v
+        self.orth2info_dict = orth2info_dict
+
+        self.phon_list = super().get_phon_list()
+        self.jchar_list = super().get_jchar_list()
+        self.source_list = self.phon_list
+        self.target_list = self.phon_list
+        self.source_ids2tkn = self.phon_ids2tkn
+        self.target_ids2tkn = self.phon_ids2tkn
+        self.source_tkn2ids = self.phon_tkn2ids
+        self.target_tkn2ids = self.phon_tkn2ids
+
+        orth2info_dict = {}
+        for k, v in self.data_dict.items():
+            orth = v['orth']
+            orth2info_dict[orth] = v
+        self.orth2info_dict = orth2info_dict
+        super().set_source_and_target_from_params(source=source, target=target)
+
+
+    def __len__(self)->int:
+        return len(self.data_dict)
+
+    def __getitem__(self, idx:int, **kwargs):
+        _inp = self.data_dict[idx][self.source]
+        _tch = self.data_dict[idx][self.target]
+        _inp_ids = self.source_tkn2ids(_inp)
+        _tch_ids = self.target_tkn2ids(_tch)
+        return _inp_ids + [self.source_list.index('<EOW>')], _tch_ids + [self.target_list.index('<EOW>')]
+
