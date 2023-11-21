@@ -31,4 +31,4 @@ from .models import fit_seq2vec
 from .models import eval_seq2vec
 
 from .w2v import get_w2v
-from kunrei import kunrei
+from .kunrei import kunrei
