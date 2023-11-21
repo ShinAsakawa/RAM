@@ -11,6 +11,7 @@ import time
 import datetime
 import matplotlib.pyplot as plt
 from tqdm.notebook import tqdm
+from termcolor import colored
 
 class Seq2Seq_wAtt(nn.Module):
     """ 注意つき符号化器‐復号化器モデル
