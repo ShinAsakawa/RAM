@@ -32,3 +32,4 @@ from .models import eval_seq2vec
 
 from .w2v import get_w2v
 from .kunrei import kunrei
+from .transformer import Transformer
