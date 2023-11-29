@@ -480,7 +480,7 @@ def eval_seq2vec(
         enc_inp, dec_inp = _inp.unsqueeze(0).to(device), _tch.unsqueeze(0).to(device)
 
         # モデルに入力して出力を取得する
-        out_vec, _ = model(enc_inp).to('cpu')
+        out_vec, _ = model(enc_inp)
         out_vec = out_vec.detach().squeeze(0).cpu().numpy()[0]
 
         grand_truth = ds.getitem(N)  # 正解を得る
