@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import torch.nn.functional as F
@@ -481,14 +480,14 @@ def eval_seq2vec(
         enc_inp, dec_inp = _inp.unsqueeze(0).to(device), _tch.unsqueeze(0).to(device)
 
         # モデルに入力して出力を取得する
-        out_vec, _ = model(enc_inp) #.to(device)
-        out_vec = out_vec.detach().squeeze(0).numpy()[0]
+        out_vec, _ = model(enc_inp).to('cpu')
+        out_vec = out_vec.detach().squeeze(0).cpu().numpy()[0]
 
         grand_truth = ds.getitem(N)  # 正解を得る
         tgt_wrd = grand_truth[0]     # 正解単語を得る
 
         # 正解単語の意味的類似語を得る。最後に [1:] しているのは自分自身は不要だから
-        tgt_neighbors = ds.w2v.most_similar(_tch.detach().numpy())[1:]
+        tgt_neighbors = ds.w2v.most_similar(_tch.detach().cpu().numpy())[1:]
 
         # モデル出力から得られた単語ベクトルの意味的類似語を得る
         out_neighbors = ds.w2v.similar_by_vector(out_vec)
