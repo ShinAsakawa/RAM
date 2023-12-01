@@ -289,7 +289,7 @@ def fit_seq2seq(
             enc_inp = pad_sequence(_inp, batch_first=True).to(device)
             dec_inp = pad_sequence(_tch, batch_first=True).to(device)
             tch = pad_sequence(_tch, batch_first=True, padding_value=-1.0).to(device)
-            out = model(enc_inp, dec_inp)
+            out = model(enc_inp, dec_inp).to(device)
             loss = criterion(out[0], tch[0])
             for h in range(1,len(tch)):
                 loss += criterion(out[h], tch[h])
