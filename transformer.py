@@ -209,23 +209,28 @@ class Transformer(nn.Module):
 				 num_layers:int,
 				 ff_dim:int,
 				 max_seq_length:int,
-				 dropout:float):
+				 dropout:float,
+				 device:torch.device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'),
+				 ):
 		super().__init__()
-		self.encoder_embedding = nn.Embedding(src_vocab_size, model_dim)
-		self.decoder_embedding = nn.Embedding(tgt_vocab_size, model_dim)
-		self.positional_encoding = PositionalEncoding(model_dim, max_seq_length)
+
+		self.device = device
+
+		self.encoder_embedding = nn.Embedding(src_vocab_size, model_dim, device=device)
+		self.decoder_embedding = nn.Embedding(tgt_vocab_size, model_dim, device=device)
+		self.positional_encoding = PositionalEncoding(model_dim, max_seq_length).to(device)
 
 		self.encoder_layers = nn.ModuleList([EncoderLayer(model_dim, num_heads, ff_dim, dropout) for _ in range(num_layers)])
 		self.decoder_layers = nn.ModuleList([DecoderLayer(model_dim, num_heads, ff_dim, dropout) for _ in range(num_layers)])
 
-		self.fc = nn.Linear(model_dim, tgt_vocab_size)
+		self.fc = nn.Linear(model_dim, tgt_vocab_size, device=device)
 		self.dropout = nn.Dropout(dropout)
 
 	def generate_mask(self, src, tgt):
 		src_mask = (src != 0).unsqueeze(1).unsqueeze(2)
 		tgt_mask = (tgt != 0).unsqueeze(1).unsqueeze(3)
 		seq_length = tgt.size(1)
-		nopeak_mask = (1 - torch.triu(torch.ones(1, seq_length, seq_length), diagonal=1)).bool()
+		nopeak_mask = (1 - torch.triu(torch.ones(1, seq_length, seq_length), diagonal=1)).bool().to(self.device)
 		tgt_mask = tgt_mask & nopeak_mask
 		return src_mask, tgt_mask
 
